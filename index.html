@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LevelMusic - L'Écosystème Premium</title>
+    
+    <!-- Tailwind CSS pour le style -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Import Maps -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.292.0",
+        "firebase/app": "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js"
+      }
+    }
+    </script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-[#060608] text-white">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useRef, useCallback } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { 
+          Play, Info, Search, X, ChevronLeft, ChevronRight, 
+          Star, Key, LogOut, Globe, Shield, CheckCircle, AlertTriangle, 
+          Home, Music, Disc, Headphones, FastForward, Rewind, Pause
+        } from 'lucide-react';
+        import { initializeApp } from 'firebase/app';
+        import { getAuth, signInAnonymously } from 'firebase/auth';
+        import { getFirestore, collectionGroup, getDocs } from 'firebase/firestore';
+
+        // =========================================================================
+        // ⚠️ TA MISSION EST ICI : COLLE TES DEUX CLÉS SPOTIFY CI-DESSOUS ⚠️
+        // =========================================================================
+        const SPOTIFY_CLIENT_ID = "METS_TON_CLIENT_ID_ICI";
+        const SPOTIFY_CLIENT_SECRET = "METS_TON_CLIENT_SECRET_ICI";
+        // =========================================================================
+
+        // --- NOUVEAU LOGO LEVEL MUSIC ---
+        const LevelMusicLogo = ({ className = "w-6 h-6", color = "currentColor" }) => (
+          <Music className={className} color={color} />
+        );
+
+        // --- CONFIGURATION FIREBASE (La même que LevelMovie pour partager les comptes !) ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyA3JgvNu5p-43037jvm4WRDaJHI9ES7uGM",
+          authDomain: "levelup-ia.firebaseapp.com",
+          projectId: "levelup-ia",
+          storageBucket: "levelup-ia.firebasestorage.app",
+          messagingSenderId: "229420004282",
+          appId: "1:229420004282:web:6735f059a947f0936ae383",
+          measurementId: "G-MSRDY2574K"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- STYLES GLOBAUX ---
+        const globalStyles = `
+          @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
+          
+          * { user-select: none; -webkit-user-select: none; scrollbar-width: none; }
+          input, textarea { user-select: auto; -webkit-user-select: auto; }
+          body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #060608; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+          ::-webkit-scrollbar { display: none; }
+          .bg-main { background: radial-gradient(circle at 50% 0%, #1a1025 0%, #060608 80%); min-height: 100vh; }
+          .holo-card { background: linear-gradient(135deg, rgba(30,20,45,0.6) 0%, rgba(10,10,15,0.8) 100%); border: 1px solid rgba(168,85,247,0.2); backdrop-filter: blur(30px); }
+          .music-card-hover:hover img { transform: scale(1.05); }
+        `;
+
+        function App() {
+          const [user, setUser] = useState(null);
+          const [userName, setUserName] = useState('');
+          const [accessKey, setAccessKey] = useState('');
+          const [authError, setAuthError] = useState('');
+          const [isLoadingAuth, setIsLoadingAuth] = useState(false);
+          const [isScrolled, setIsScrolled] = useState(false);
+          
+          // Spotify
+          const [spotifyToken, setSpotifyToken] = useState('');
+          const [apiError, setApiError] = useState(false);
+          
+          // Navigation
+          const [currentCategory, setCurrentCategory] = useState('home');
+          const [selectedAlbum, setSelectedAlbum] = useState(null);
+          const [currentTrack, setCurrentTrack] = useState(null); // Piste en cours de lecture
+
+          // Vérification Firebase & Clé (partagé avec LevelMovie)
+          useEffect(() => {
+            signInAnonymously(auth).catch(console.error);
+            const savedKey = localStorage.getItem('levelmovie_saved_key');
+            const savedName = localStorage.getItem('levelmovie_user_name');
+            const savedUid = localStorage.getItem('levelmovie_user_uid');
+            
+            if (savedKey && savedUid) {
+              setUser({ uid: savedUid });
+              if (savedName) setUserName(savedName);
+            }
+
+            const handleScroll = () => setIsScrolled(window.scrollY > 30);
+            window.addEventListener('scroll', handleScroll);
+            return () => window.removeEventListener('scroll', handleScroll);
+          }, []);
+
+          // Connexion API Spotify
+          useEffect(() => {
+              if (SPOTIFY_CLIENT_ID.includes("METS_TON")) {
+                  setApiError(true);
+                  return;
+              }
+              const fetchSpotifyToken = async () => {
+                  try {
+                      const res = await fetch('https://accounts.spotify.com/api/token', {
+                          method: 'POST',
+                          headers: {
+                              'Content-Type': 'application/x-www-form-urlencoded',
+                              'Authorization': 'Basic ' + btoa(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET)
+                          },
+                          body: 'grant_type=client_credentials'
+                      });
+                      const data = await res.json();
+                      if (data.access_token) {
+                          setSpotifyToken(data.access_token);
+                          setApiError(false);
+                      } else {
+                          setApiError(true);
+                      }
+                  } catch (e) {
+                      setApiError(true);
+                  }
+              };
+              fetchSpotifyToken();
+          }, []);
+
+          const formatAccessKey = (val) => {
+            let formatted = val.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+            setAccessKey(formatted.substring(0, 16));
+          };
+
+          const handleLogin = async () => {
+            if (!accessKey) return;
+            setIsLoadingAuth(true);
+            setAuthError('');
+            try {
+              const q = collectionGroup(db, 'security');
+              const querySnapshot = await getDocs(q);
+              let foundUserData = null;
+              querySnapshot.forEach(docSnap => {
+                if (docSnap.data().key === accessKey) foundUserData = docSnap.data();
+              });
+              
+              if (foundUserData) {
+                const uid = foundUserData.uid || accessKey;
+                const name = foundUserData.name || foundUserData.displayName || "Utilisateur";
+                setUser({ uid });
+                setUserName(name);
+                localStorage.setItem('levelmovie_saved_key', accessKey);
+                localStorage.setItem('levelmovie_user_name', name);
+                localStorage.setItem('levelmovie_user_uid', uid);
+              } else {
+                setAuthError("Clé invalide.");
+              }
+            } catch (error) {
+              setAuthError("Erreur serveur.");
+            }
+            setIsLoadingAuth(false);
+          };
+
+          // ---------------------------------------------
+          // ÉCRAN DE CONNEXION (Si pas de clé LVL)
+          // ---------------------------------------------
+          if (!user) {
+            return (
+              <div className="bg-main flex items-center justify-center p-4 sm:p-8 fixed inset-0 z-[5000]">
+                <style>{globalStyles}</style>
+                <div className="w-full max-w-sm text-center py-4 relative glass p-8 rounded-[2rem] border border-white/5 shadow-[0_0_50px_rgba(168,85,247,0.15)] bg-black/40 backdrop-blur-xl">
+                  <LevelMusicLogo className="w-12 h-12 text-[#a855f7] mx-auto mb-4" />
+                  <h1 className="text-3xl font-black tracking-widest mb-10 drop-shadow-md">
+                    <span className="text-white">Level</span><span className="text-[#a855f7]">Music</span>
+                  </h1>
+                  <div className="space-y-6">
+                    <p className="text-[11px] font-bold text-[#a855f7] uppercase tracking-[0.1em] mb-2 flex items-center justify-center gap-2">
+                      <Shield className="w-4 h-4" /> Clé d'Accès requise
+                    </p>
+                    <input 
+                      type="text" value={accessKey} onChange={(e) => formatAccessKey(e.target.value)}
+                      placeholder="LVL-XXXXX-XXXXX" 
+                      className="w-full bg-[#030305] border border-[#a855f7]/40 rounded-xl py-4 px-5 text-center text-white font-mono text-base tracking-widest outline-none focus:border-[#a855f7] transition-all uppercase"
+                    />
+                    <button 
+                      onClick={handleLogin} disabled={isLoadingAuth}
+                      className="w-full bg-gradient-to-r from-[#8b5cf6] to-[#a855f7] text-white py-4 rounded-xl font-black text-[12px] uppercase tracking-[0.1em] hover:opacity-90 active:scale-95 shadow-[0_0_25px_rgba(168,85,247,0.4)] disabled:opacity-50"
+                    >
+                      {isLoadingAuth ? "Vérification..." : "Connexion"}
+                    </button>
+                    {authError && <p className="text-[12px] text-red-400 font-bold mt-2">{authError}</p>}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          // ---------------------------------------------
+          // ÉCRAN DE CONFIGURATION (Si clés Spotify manquantes)
+          // ---------------------------------------------
+          if (apiError || !spotifyToken) {
+              return (
+                  <div className="bg-main flex items-center justify-center fixed inset-0 z-[5000] p-6">
+                      <style>{globalStyles}</style>
+                      <div className="holo-card max-w-xl w-full p-10 rounded-[2rem] text-center shadow-2xl animate-in zoom-in">
+                          <AlertTriangle className="w-16 h-16 text-yellow-500 mx-auto mb-6" />
+                          <h2 className="text-2xl font-black uppercase tracking-widest mb-4">Configuration Spotify Requise</h2>
+                          <p className="text-white/70 text-sm mb-6 leading-relaxed">
+                              Tu dois insérer tes clés API pour débloquer LevelMusic. 
+                              <br/>1. Va sur <b>developer.spotify.com/dashboard</b>
+                              <br/>2. Crée une application (Redirect URI: http://localhost)
+                              <br/>3. Copie le <b>Client ID</b> et le <b>Client Secret</b>.
+                              <br/>4. Colle-les au début de ce code source !
+                          </p>
+                          <div className="text-xs font-mono bg-black/50 p-4 rounded-xl text-left border border-white/10 text-yellow-300">
+                              const SPOTIFY_CLIENT_ID = "...";<br/>
+                              const SPOTIFY_CLIENT_SECRET = "...";
+                          </div>
+                      </div>
+                  </div>
+              )
+          }
+
+          // ---------------------------------------------
+          // APPLICATION PRINCIPALE
+          // ---------------------------------------------
+          return (
+            <div className="bg-main text-white min-h-screen pb-28">
+              <style>{globalStyles}</style>
+
+              {/* HEADER (Même style que LevelMovie) */}
+              <header className={`fixed top-0 w-full z-50 transition-all duration-500 flex items-center justify-between px-6 md:px-10 py-4 ${isScrolled ? 'bg-black/80 backdrop-blur-2xl border-b border-white/5' : 'bg-gradient-to-b from-[#060608] to-transparent'}`}>
+                <div className="flex items-center gap-10">
+                  <h1 className="text-2xl font-black tracking-widest flex items-center gap-2 cursor-pointer">
+                    <LevelMusicLogo className="w-6 h-6 text-[#a855f7]" />
+                    <span><span className="text-white">Level</span><span className="text-[#a855f7]">Music</span></span>
+                  </h1>
+                  <nav className="hidden lg:flex space-x-6 text-[12px] font-bold uppercase tracking-widest text-white/60">
+                    <button onClick={() => setCurrentCategory('home')} className={`hover:text-white ${currentCategory === 'home' ? 'text-[#a855f7]' : ''}`}>Découvrir</button>
+                    <button onClick={() => setCurrentCategory('playlists')} className={`hover:text-white ${currentCategory === 'playlists' ? 'text-[#a855f7]' : ''}`}>Playlists</button>
+                    <a href="index.html" className="hover:text-white text-white/40 flex items-center gap-1"><Film className="w-4 h-4"/> LevelMovie</a>
+                  </nav>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-[#151520] flex items-center justify-center border border-[#a855f7]/40 shadow-inner">
+                   <span className="text-[13px] font-black text-[#a855f7]">{userName.charAt(0).toUpperCase()}</span>
+                </div>
+              </header>
+
+              {/* CONTENU : BANNIÈRE ET LIGNES */}
+              <SpotifyBanner token={spotifyToken} onSelect={setSelectedAlbum} />
+              
+              <main className="relative z-20 space-y-10 mt-6 md:-mt-10">
+                  {currentCategory === 'home' && (
+                      <>
+                          <SpotifyRow token={spotifyToken} title="Nouvelles Sorties" endpoint="/browse/new-releases?limit=20" type="albums" onSelect={setSelectedAlbum} isLarge={true} />
+                          <SpotifyRow token={spotifyToken} title="Hits du Moment" endpoint="/browse/featured-playlists?limit=20" type="playlists" onSelect={setSelectedAlbum} />
+                          <SpotifyRow token={spotifyToken} title="Rap & Hip-Hop" endpoint="/browse/categories/hiphop/playlists?limit=20" type="playlists" onSelect={setSelectedAlbum} />
+                          <SpotifyRow token={spotifyToken} title="Pop Internationale" endpoint="/browse/categories/pop/playlists?limit=20" type="playlists" onSelect={setSelectedAlbum} />
+                          <SpotifyRow token={spotifyToken} title="Afrobeats" endpoint="/browse/categories/afro/playlists?limit=20" type="playlists" onSelect={setSelectedAlbum} />
+                      </>
+                  )}
+                  {currentCategory === 'playlists' && (
+                      <>
+                          <SpotifyRow token={spotifyToken} title="Électro & Dance" endpoint="/browse/categories/edm_dance/playlists?limit=20" type="playlists" onSelect={setSelectedAlbum} isLarge={true}/>
+                          <SpotifyRow token={spotifyToken} title="R&B Mood" endpoint="/browse/categories/rnb/playlists?limit=20" type="playlists" onSelect={setSelectedAlbum} />
+                          <SpotifyRow token={spotifyToken} title="Détente & Chill" endpoint="/browse/categories/chill/playlists?limit=20" type="playlists" onSelect={setSelectedAlbum} />
+                      </>
+                  )}
+              </main>
+
+              {/* MODALE ALBUM / PLAYLIST */}
+              {selectedAlbum && (
+                  <MusicModal 
+                      item={selectedAlbum} 
+                      token={spotifyToken} 
+                      onClose={() => setSelectedAlbum(null)} 
+                      onPlay={(track, img) => setCurrentTrack({...track, coverArt: img})}
+                  />
+              )}
+
+              {/* LECTEUR AUDIO FIXE (La magie opère ici) */}
+              <BottomPlayer track={currentTrack} onClose={() => setCurrentTrack(null)} />
+            </div>
+          );
+        }
+
+        // =========================================================================
+        // COMPOSANTS SPÉCIFIQUES SPOTIFY
+        // =========================================================================
+
+        function SpotifyBanner({ token, onSelect }) {
+          const [hero, setHero] = useState(null);
+          useEffect(() => {
+              if(!token) return;
+              fetch('https://api.spotify.com/v1/browse/new-releases?limit=10', {
+                  headers: { 'Authorization': `Bearer ${token}` }
+              }).then(r=>r.json()).then(data => {
+                  if (data.albums?.items) {
+                      setHero(data.albums.items[Math.floor(Math.random() * data.albums.items.length)]);
+                  }
+              });
+          }, [token]);
+
+          if (!hero) return <div className="h-[65vh] w-full bg-[#060608] animate-pulse"></div>;
+          const imageUrl = hero.images?.[0]?.url;
+
+          return (
+            <header className="relative h-[60vh] md:h-[75vh] min-h-[450px] transition-all duration-700" style={{ backgroundSize: 'cover', backgroundPosition: 'center', backgroundImage: `url("${imageUrl}")` }}>
+                <div className="absolute inset-0 bg-gradient-to-r from-[#060608] via-[#060608]/80 to-transparent w-full md:w-[80%]"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-[#060608] via-[#060608]/50 to-transparent"></div>
+                
+                <div className="relative z-10 flex flex-col justify-end h-full px-6 md:px-14 pb-16 max-w-4xl">
+                    <span className="text-[#a855f7] font-black tracking-[0.3em] text-[10px] uppercase mb-4 flex items-center gap-2">
+                        <Disc className="w-4 h-4" /> Nouveauté de la semaine
+                    </span>
+                    <h1 className="text-4xl md:text-6xl font-black text-white uppercase tracking-tighter mb-2 leading-tight drop-shadow-lg line-clamp-2">
+                        {hero.name}
+                    </h1>
+                    <p className="text-lg text-white/70 font-medium mb-8">Par {hero.artists.map(a=>a.name).join(', ')}</p>
+                    
+                    <button onClick={() => onSelect({...hero, type: 'album'})} className="w-fit flex items-center gap-3 px-8 py-4 bg-[#a855f7] text-white rounded-2xl font-black uppercase tracking-widest hover:scale-105 transition-transform shadow-[0_0_30px_rgba(168,85,247,0.4)]">
+                        <Headphones className="w-5 h-5" /> Découvrir l'album
+                    </button>
+                </div>
+            </header>
+          );
+        }
+
+        function SpotifyRow({ title, endpoint, token, type, onSelect, isLarge }) {
+          const [items, setItems] = useState([]);
+          const rowRef = useRef(null);
+
+          useEffect(() => {
+              if(!token) return;
+              fetch(`https://api.spotify.com/v1${endpoint}`, {
+                  headers: { 'Authorization': `Bearer ${token}` }
+              }).then(r=>r.json()).then(data => {
+                  let extracted = [];
+                  if (type === 'albums') extracted = data.albums?.items || [];
+                  if (type === 'playlists') extracted = data.playlists?.items || [];
+                  setItems(extracted.filter(i=>i && i.images?.length > 0));
+              });
+          }, [endpoint, token, type]);
+
+          if (items.length === 0) return null;
+
+          const scrollAction = (dir) => {
+              if (rowRef.current) rowRef.current.scrollBy({ left: dir === 'left' ? -300 : 300, behavior: 'smooth' });
+          }
+
+          return (
+            <div className="group relative ml-6 md:ml-14">
+                <h2 className="text-white/90 text-sm md:text-lg font-black mb-4 uppercase tracking-[0.2em] border-l-4 border-[#a855f7] pl-4">{title}</h2>
+                <div ref={rowRef} className="flex overflow-x-scroll py-4 space-x-4 md:space-x-6 no-scrollbar">
+                    {items.map(item => {
+                      const imgClass = isLarge ? 'w-[160px] md:w-[220px] h-[160px] md:h-[220px]' : 'w-[130px] md:w-[160px] h-[130px] md:h-[160px]';
+                      return (
+                          <div key={item.id} className="relative flex-none cursor-pointer group" onClick={() => onSelect({...item, type: type === 'albums' ? 'album' : 'playlist'})}>
+                              <div className={`rounded-2xl overflow-hidden shadow-lg border border-white/5 bg-[#151520] transition-transform duration-300 group-hover:scale-105 ${imgClass}`}>
+                                  <img className="object-cover w-full h-full" src={item.images[0].url} loading="lazy" draggable="false" alt=""/>
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                      <div className="w-12 h-12 bg-[#a855f7] rounded-full flex items-center justify-center shadow-xl">
+                                          <Play className="w-5 h-5 fill-white text-white ml-1" />
+                                      </div>
+                                  </div>
+                              </div>
+                              <p className="text-white font-bold text-xs mt-3 truncate w-full">{item.name}</p>
+                              {item.artists && <p className="text-white/50 text-[10px] truncate">{item.artists.map(a=>a.name).join(', ')}</p>}
+                              {item.owner && <p className="text-white/50 text-[10px] truncate">Playlist • {item.owner.display_name}</p>}
+                          </div>
+                      )
+                    })}
+                </div>
+            </div>
+          )
+        }
+
+        // --- MODALE DES PISTES ---
+        function MusicModal({ item, token, onClose, onPlay }) {
+            const [tracks, setTracks] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const mainImage = item.images?.[0]?.url;
+
+            useEffect(() => {
+                const fetchTracks = async () => {
+                    try {
+                        const res = await fetch(`https://api.spotify.com/v1/${item.type}s/${item.id}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await res.json();
+                        if (item.type === 'album') setTracks(data.tracks?.items || []);
+                        if (item.type === 'playlist') setTracks(data.tracks?.items?.map(i => i.track).filter(t=>t) || []);
+                        setLoading(false);
+                    } catch(e) { setLoading(false); }
+                };
+                fetchTracks();
+            }, [item.id, item.type, token]);
+
+            const formatDuration = (ms) => {
+                if(!ms) return "0:00";
+                const minutes = Math.floor(ms / 60000);
+                const seconds = ((ms % 60000) / 1000).toFixed(0);
+                return minutes + ":" + (seconds < 10 ? '0' : '') + seconds;
+            };
+
+            return (
+                <div className="fixed inset-0 z-[8000] flex justify-center items-center p-4 sm:p-8 bg-black/90 backdrop-blur-2xl">
+                    <div className="holo-card relative w-full max-w-4xl h-[90vh] rounded-[2rem] flex flex-col md:flex-row overflow-hidden shadow-2xl animate-in zoom-in">
+                        <button onClick={onClose} className="absolute top-4 right-4 z-50 p-2 bg-black/50 hover:bg-red-500 rounded-full text-white transition-colors">
+                            <X className="w-5 h-5" />
+                        </button>
+
+                        <div className="w-full md:w-1/3 bg-[#0a0a0f] p-8 flex flex-col items-center justify-center border-r border-white/5">
+                            <img src={mainImage} className="w-48 h-48 md:w-64 md:h-64 object-cover rounded-2xl shadow-[0_0_40px_rgba(168,85,247,0.3)] mb-6" alt=""/>
+                            <h2 className="text-2xl font-black text-center uppercase tracking-widest">{item.name}</h2>
+                            {item.artists && <p className="text-[#a855f7] font-bold mt-2 text-sm">{item.artists.map(a=>a.name).join(', ')}</p>}
+                            <p className="text-white/40 text-xs mt-4 uppercase tracking-[0.2em]">{item.type}</p>
+                        </div>
+
+                        <div className="w-full md:w-2/3 p-6 md:p-8 overflow-y-auto no-scrollbar bg-black/40">
+                            <h3 className="text-lg font-black uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-white/10 pb-4"><Disc className="w-5 h-5 text-[#a855f7]" /> Liste des titres</h3>
+                            
+                            {loading ? (
+                                <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#a855f7]"></div></div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {tracks.map((track, idx) => {
+                                        const trackImage = track.album?.images?.[0]?.url || mainImage;
+                                        return (
+                                            <div key={track.id} onClick={() => onPlay(track, trackImage)} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 cursor-pointer group transition-all">
+                                                <span className="w-6 text-center text-white/30 text-xs font-mono group-hover:hidden">{idx + 1}</span>
+                                                <Play className="w-6 h-6 text-[#a855f7] hidden group-hover:block ml-1" />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-white font-bold text-sm truncate">{track.name}</p>
+                                                    <p className="text-white/50 text-xs truncate">{track.artists?.map(a=>a.name).join(', ')}</p>
+                                                </div>
+                                                <span className="text-white/40 text-xs font-mono">{formatDuration(track.duration_ms)}</span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )
+        }
+
+        // --- LECTEUR AUDIO SECRET (YOUTUBE INVISIBLE) ---
+        function BottomPlayer({ track, onClose }) {
+            if (!track) return null;
+            
+            // Le secret professionnel : on crée une recherche automatique sur Youtube et on joue le premier résultat "audio"
+            const artistName = track.artists ? track.artists.map(a=>a.name).join(', ') : '';
+            const query = encodeURIComponent(`${artistName} ${track.name} audio`);
+            const ytUrl = `https://www.youtube.com/embed?listType=search&list=${query}&autoplay=1`;
+            
+            return (
+                <div className="fixed bottom-0 left-0 w-full h-24 bg-[#0a0a0f]/95 backdrop-blur-2xl border-t border-[#a855f7]/30 flex items-center justify-between px-4 md:px-8 z-[9999] shadow-[0_-20px_50px_rgba(0,0,0,0.6)] animate-in slide-in-from-bottom">
+                    
+                    <div className="flex items-center gap-4 w-[40%] md:w-1/3 overflow-hidden">
+                        <img src={track.coverArt || "https://via.placeholder.com/150"} className="w-12 h-12 md:w-16 md:h-16 rounded-xl shadow-lg border border-white/10" alt=""/>
+                        <div className="truncate">
+                            <p className="text-white font-black text-xs md:text-sm truncate drop-shadow-md">{track.name}</p>
+                            <p className="text-white/60 text-[10px] md:text-xs truncate">{artistName}</p>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-center gap-4 md:gap-8 w-[20%] md:w-1/3">
+                        <button className="text-white/40 hover:text-[#a855f7] transition-colors hidden sm:block"><Rewind className="w-5 h-5 fill-current" /></button>
+                        <div className="w-12 h-12 md:w-14 md:h-14 bg-gradient-to-tr from-[#8b5cf6] to-[#a855f7] rounded-full flex items-center justify-center shadow-[0_0_25px_rgba(168,85,247,0.5)] border border-white/20">
+                            {/* Fausse animation de lecture Premium */}
+                            <div className="flex gap-1 items-end justify-center h-4">
+                                <div className="w-1 bg-white rounded-full animate-[bounce_1s_infinite] h-full"></div>
+                                <div className="w-1 bg-white rounded-full animate-[bounce_1.2s_infinite] h-2/3"></div>
+                                <div className="w-1 bg-white rounded-full animate-[bounce_0.8s_infinite] h-4/5"></div>
+                            </div>
+                        </div>
+                        <button className="text-white/40 hover:text-[#a855f7] transition-colors hidden sm:block"><FastForward className="w-5 h-5 fill-current" /></button>
+                    </div>
+                    
+                    <div className="flex items-center justify-end w-[40%] md:w-1/3 gap-4">
+                         <span className="text-[#a855f7] font-bold text-[10px] uppercase tracking-widest hidden sm:block">Lecture en cours...</span>
+                         <button onClick={onClose} className="p-2.5 rounded-full bg-white/5 hover:bg-red-500 hover:text-white transition-colors border border-white/10">
+                             <X className="w-4 h-4" />
+                         </button>
+                    </div>
+
+                    {/* L'iframe Youtube magique (cachée, elle fournit juste le son de haute qualité !) */}
+                    <iframe src={ytUrl} className="hidden" allow="autoplay; encrypted-media"></iframe>
+                </div>
+            )
+        }
+
+        // Render
+        const rootElement = document.getElementById('root');
+        const root = createRoot(rootElement);
+        root.render(<App />);
+    </script>
+</body>
+</html>
