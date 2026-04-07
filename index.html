@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LevelMusic - L'Écosystème Premium</title>
     
-    <!-- Tailwind CSS pour le style -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Import Maps -->
     <script type="importmap">
     {
       "imports": {
@@ -32,20 +30,20 @@
         import { createRoot } from 'react-dom/client';
         import { 
           Play, Info, Search, X, ChevronLeft, ChevronRight, 
-          Star, Key, LogOut, Globe, Shield, CheckCircle, AlertTriangle, 
+          Star, Key, LogOut, Shield, CheckCircle, AlertTriangle, 
           Home, Music, Disc, Headphones, FastForward, Rewind, Pause, 
-          Bookmark, Plus, Share2, Filter, HardDrive, ListMusic
+          Bookmark, Plus, Share2, Filter, HardDrive, ListMusic, Cloud, ListPlus, ListOrdered, MoreVertical, Trash2
         } from 'lucide-react';
         import { initializeApp } from 'firebase/app';
         import { getAuth, signInAnonymously } from 'firebase/auth';
-        import { getFirestore, collectionGroup, getDocs, doc, setDoc, deleteDoc, collection } from 'firebase/firestore';
+        import { getFirestore, collectionGroup, getDocs, doc, setDoc, deleteDoc, collection, getDoc } from 'firebase/firestore';
 
-        // --- LOGO LEVEL MUSIC PRO ---
+        // --- NOUVEAU LOGO LEVEL MUSIC ---
         const LevelMusicLogo = ({ className = "w-6 h-6", color = "currentColor" }) => (
           <Music className={className} color={color} />
         );
 
-        // --- CONFIGURATION FIREBASE (La même que LevelMovie pour partager les clés d'accès !) ---
+        // --- CONFIGURATION FIREBASE ---
         const firebaseConfig = {
           apiKey: "AIzaSyA3JgvNu5p-43037jvm4WRDaJHI9ES7uGM",
           authDomain: "levelup-ia.firebaseapp.com",
@@ -61,7 +59,7 @@
         const db = getFirestore(app);
         const APP_ID = "level-ia-premium";
 
-        // --- STYLES GLOBAUX (Anti-sélection comme LevelMovie) ---
+        // --- STYLES GLOBAUX ---
         const globalStyles = `
           @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
           
@@ -75,6 +73,11 @@
           .splash-text { opacity: 0; position: absolute; transform: scale(0.85); filter: blur(15px); transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); text-align: center; }
           .splash-text.active { opacity: 1; transform: scale(1); filter: blur(0px); }
           .splash-text.exit { opacity: 0; transform: scale(1.2); filter: blur(30px); }
+
+          /* Custom Range Slider */
+          input[type=range] { -webkit-appearance: none; background: rgba(255,255,255,0.1); border-radius: 8px; height: 4px; outline: none; }
+          input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #a855f7; cursor: pointer; box-shadow: 0 0 10px rgba(168,85,247,0.8); transition: transform 0.1s; }
+          input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.3); }
         `;
 
         function App() {
@@ -85,27 +88,27 @@
           const [isLoadingAuth, setIsLoadingAuth] = useState(false);
           const [isScrolled, setIsScrolled] = useState(false);
           
-          // Splash
           const [showSplash, setShowSplash] = useState(true);
           const [splashStep, setSplashStep] = useState(0);
 
-          // Navigation & UI
           const [currentCategory, setCurrentCategory] = useState('home');
           const [selectedAlbum, setSelectedAlbum] = useState(null);
-          const [currentTrack, setCurrentTrack] = useState(null);
           const [showSettings, setShowSettings] = useState(false);
           const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
           const [toasts, setToasts] = useState([]);
 
-          // Recherche
           const [searchQuery, setSearchQuery] = useState('');
           const [searchResults, setSearchResults] = useState([]);
 
-          // Watchlist
-          const [watchlist, setWatchlist] = useState([]);
-          const [watchlistData, setWatchlistData] = useState([]);
+          // État du Lecteur Global
+          const [currentTrack, setCurrentTrack] = useState(null); 
+          const [queue, setQueue] = useState([]);
+          const [queueIndex, setQueueIndex] = useState(0);
 
-          // --- INITIALISATION ---
+          // Playlists Personnalisées
+          const [userPlaylists, setUserPlaylists] = useState([]);
+          const [showPlaylistCreator, setShowPlaylistCreator] = useState(false);
+
           useEffect(() => {
             signInAnonymously(auth).catch(console.error);
             const savedKey = localStorage.getItem('levelmovie_saved_key');
@@ -117,7 +120,6 @@
               if (savedName) setUserName(savedName);
             }
 
-            // Animation Splash
             const t1 = setTimeout(() => setSplashStep(1), 200);   
             const t2 = setTimeout(() => setSplashStep(2), 1400);  
             const t3 = setTimeout(() => setSplashStep(3), 2800);  
@@ -131,32 +133,22 @@
             }
           }, []);
 
-          // --- FETCH WATCHLIST (Firebase) ---
+          // --- FETCH PLAYLISTS FIREBASE ---
           useEffect(() => {
-            if (!user) return;
-            const localData = JSON.parse(localStorage.getItem('levelmusic_watchlist_' + user.uid) || '[]');
-            if (localData.length > 0) {
-              setWatchlistData(localData);
-              setWatchlist(localData.map(m => m.id));
-            }
-            const fetchWatchlist = async () => {
-              try {
-                // Utilise une collection différente pour ne pas mélanger avec les films !
-                const q = collection(db, "artifacts", APP_ID, "users", user.uid, "watchlist_music");
-                const snaps = await getDocs(q);
-                const data = [];
-                snaps.forEach(doc => data.push(doc.data()));
-                if (data.length > 0 || localData.length > 0) {
-                    setWatchlist(data.map(m => m.id));
-                    setWatchlistData(data);
-                    localStorage.setItem('levelmusic_watchlist_' + user.uid, JSON.stringify(data));
-                }
-              } catch (e) {}
-            };
-            fetchWatchlist();
+              if (!user) return;
+              const fetchCustomPlaylists = async () => {
+                  try {
+                      const q = collection(db, "artifacts", APP_ID, "users", user.uid, "custom_playlists");
+                      const snaps = await getDocs(q);
+                      const data = [];
+                      snaps.forEach(doc => data.push(doc.data()));
+                      setUserPlaylists(data);
+                  } catch (e) { console.error(e); }
+              };
+              fetchCustomPlaylists();
           }, [user]);
 
-          // --- RECHERCHE MONDIALE (API APPLE MUSIC) ---
+          // --- RECHERCHE HYBRIDE (ALBUMS ET MUSIQUES) ---
           useEffect(() => {
             if (searchQuery.trim() === '') {
               setSearchResults([]);
@@ -164,13 +156,15 @@
             }
             const delayDebounceFn = setTimeout(async () => {
               try {
-                const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchQuery)}&entity=album&limit=25&country=FR`);
+                // Recherche les musiques directement
+                const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchQuery)}&entity=song&limit=30&country=FR`);
                 const data = await res.json();
                 const formatted = data.results.map(r => ({
-                    id: r.collectionId,
-                    name: r.collectionName,
+                    id: r.trackId,
+                    name: r.trackName,
                     artist: r.artistName,
-                    image: r.artworkUrl100.replace('100x100bb', '600x600bb')
+                    image: r.artworkUrl100.replace('100x100bb', '600x600bb'),
+                    type: 'song'
                 }));
                 setSearchResults(formatted);
               } catch (e) {}
@@ -178,34 +172,79 @@
             return () => clearTimeout(delayDebounceFn);
           }, [searchQuery]);
 
-          // --- TOASTS ---
           const showToast = useCallback((msg, type = 'info') => {
             const id = Date.now() + Math.random();
             setToasts(prev => [...prev, { id, msg, type }]);
             setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
           }, []);
 
-          // --- ACTIONS GLOBALES ---
-          const toggleWatchlist = async (album) => {
-            if (!user) return;
-            const isAdded = watchlist.includes(album.id);
-            let newList;
-            if (isAdded) {
-                newList = watchlistData.filter(m => m.id !== album.id);
-                showToast("Retiré des favoris", "success");
-            } else {
-                const dataObj = { id: album.id, name: album.name, artist: album.artist, image: album.image, addedAt: Date.now() };
-                newList = [...watchlistData, dataObj];
-                showToast("Ajouté aux favoris !", "success");
-            }
-            setWatchlistData(newList);
-            setWatchlist(newList.map(m => m.id));
-            localStorage.setItem('levelmusic_watchlist_' + user.uid, JSON.stringify(newList));
-            try {
-                const ref = doc(db, "artifacts", APP_ID, "users", user.uid, "watchlist_music", album.id.toString());
-                if (isAdded) await deleteDoc(ref);
-                else await setDoc(ref, newList.find(m => m.id === album.id));
-            } catch(e) {}
+          // --- GESTION DES PLAYLISTS ---
+          const createPlaylist = async (name) => {
+              if(!user || !name.trim()) return;
+              const newPl = { id: Date.now().toString(), name: name, tracks: [], createdAt: Date.now() };
+              const updated = [...userPlaylists, newPl];
+              setUserPlaylists(updated);
+              setShowPlaylistCreator(false);
+              showToast("Playlist créée !", "success");
+              try {
+                  await setDoc(doc(db, "artifacts", APP_ID, "users", user.uid, "custom_playlists", newPl.id), newPl);
+              } catch(e) {}
+          };
+
+          const addTrackToPlaylist = async (playlistId, track) => {
+              if(!user) return;
+              const plIndex = userPlaylists.findIndex(p => p.id === playlistId);
+              if(plIndex === -1) return;
+              
+              const updatedPl = { ...userPlaylists[plIndex] };
+              if(!updatedPl.tracks.find(t => t.id === track.id)) {
+                  updatedPl.tracks.push(track);
+                  const newLists = [...userPlaylists];
+                  newLists[plIndex] = updatedPl;
+                  setUserPlaylists(newLists);
+                  showToast("Ajouté à la playlist", "success");
+                  try {
+                      await setDoc(doc(db, "artifacts", APP_ID, "users", user.uid, "custom_playlists", playlistId), updatedPl);
+                  } catch(e) {}
+              } else {
+                  showToast("Déjà dans la playlist", "error");
+              }
+          };
+
+          const deletePlaylist = async (playlistId) => {
+              if(!user) return;
+              const newLists = userPlaylists.filter(p => p.id !== playlistId);
+              setUserPlaylists(newLists);
+              showToast("Playlist supprimée", "success");
+              try {
+                  await deleteDoc(doc(db, "artifacts", APP_ID, "users", user.uid, "custom_playlists", playlistId));
+              } catch(e) {}
+          };
+
+          // --- GESTION DE LA FILE D'ATTENTE (QUEUE) ---
+          const handlePlayTrack = (track, newQueue = null, index = 0) => {
+              setCurrentTrack(track);
+              if (newQueue) {
+                  setQueue(newQueue);
+                  setQueueIndex(index);
+              } else {
+                  setQueue([track]);
+                  setQueueIndex(0);
+              }
+          };
+
+          const handleNextTrack = () => {
+              if (queueIndex < queue.length - 1) {
+                  setQueueIndex(queueIndex + 1);
+                  setCurrentTrack(queue[queueIndex + 1]);
+              }
+          };
+
+          const handlePrevTrack = () => {
+              if (queueIndex > 0) {
+                  setQueueIndex(queueIndex - 1);
+                  setCurrentTrack(queue[queueIndex - 1]);
+              }
           };
 
           const handleNavCategory = (cat) => {
@@ -248,9 +287,6 @@
             setIsLoadingAuth(false);
           };
 
-          // ---------------------------------------------
-          // SPLASH SCREEN
-          // ---------------------------------------------
           if (showSplash) {
             return (
               <div className={`fixed inset-0 z-[9999] bg-[#060608] flex items-center justify-center flex-col transition-opacity duration-500 ${splashStep === 3 ? 'opacity-0' : 'opacity-100'}`}>
@@ -265,15 +301,12 @@
                 </div>
                 <div className={`splash-text flex flex-col items-center justify-center ${splashStep === 2 ? 'active' : ''} ${splashStep >= 3 ? 'exit' : ''}`}>
                    <span className="text-white font-black tracking-[0.6em] text-2xl uppercase">LevelUp</span>
-                   <span className="text-[10px] font-bold tracking-[0.5em] text-[#a855f7] mt-4 uppercase">Version Audio</span>
+                   <span className="text-[10px] font-bold tracking-[0.5em] text-[#a855f7] mt-4 uppercase">Le Catalogue Mondial</span>
                 </div>
               </div>
             );
           }
 
-          // ---------------------------------------------
-          // ÉCRAN DE CONNEXION (Si pas de clé LVL)
-          // ---------------------------------------------
           if (!user) {
             return (
               <div className="bg-main flex items-center justify-center p-4 sm:p-8 fixed inset-0 z-[5000]">
@@ -305,11 +338,25 @@
             );
           }
 
-          // ---------------------------------------------
-          // APPLICATION PRINCIPALE
-          // ---------------------------------------------
+          const EXTENDED_GENRES = [
+              { title: "Drill & Trap", term: "drill trap uk" },
+              { title: "Rap US", term: "rap us hiphop" },
+              { title: "R&B 90s & Soul", term: "rnb soul 90s" },
+              { title: "Pop Hits & Top 50", term: "pop hits top" },
+              { title: "K-Pop", term: "kpop bts blackpink" },
+              { title: "Afrobeat & Amapiano", term: "afrobeat amapiano" },
+              { title: "Latino & Reggaeton", term: "reggaeton latino" },
+              { title: "Électro, House & Techno", term: "electro house techno" },
+              { title: "Lo-Fi & Chillhop", term: "lofi chillhop study" },
+              { title: "Rock, Punk & Metal", term: "rock metal punk" },
+              { title: "Jazz & Blues", term: "jazz blues classic" },
+              { title: "Reggae & Dancehall", term: "reggae dancehall jamaica" },
+              { title: "Musique Classique", term: "classical piano mozart" },
+              { title: "Variété Française", term: "chanson francaise variete" }
+          ];
+
           return (
-            <div className="bg-main text-white min-h-screen pb-28">
+            <div className="bg-main text-white min-h-screen pb-32">
               <style>{globalStyles}</style>
 
               {/* TOASTS */}
@@ -329,7 +376,7 @@
                 })}
               </div>
 
-              {/* HEADER (Exactement comme LevelMovie) */}
+              {/* HEADER */}
               <header className={`fixed top-0 w-full z-50 transition-all duration-500 flex items-center justify-between px-4 md:px-10 py-3 md:py-4 ${isScrolled ? 'bg-black/80 backdrop-blur-2xl border-b border-white/5 shadow-xl' : 'bg-gradient-to-b from-[#060608] via-[#060608]/90 to-transparent'}`}>
                 <div className="flex items-center space-x-6 md:space-x-10">
                   <div className="flex items-center gap-3 cursor-pointer outline-none" onClick={() => handleNavCategory('home')}>
@@ -342,7 +389,7 @@
                   <nav className="hidden lg:flex space-x-6 text-[12px] font-bold uppercase tracking-widest text-white/60">
                     <button onClick={() => handleNavCategory('home')} className={`hover:text-white outline-none transition-colors ${currentCategory === 'home' ? 'text-[#a855f7]' : ''}`}>Découvrir</button>
                     <button onClick={() => handleNavCategory('playlists')} className={`hover:text-white outline-none transition-colors ${currentCategory === 'playlists' ? 'text-[#a855f7]' : ''}`}>Genres</button>
-                    <button onClick={() => handleNavCategory('watchlist')} className={`hover:text-white outline-none transition-colors ${currentCategory === 'watchlist' ? 'text-[#a855f7]' : ''}`}>Ma Musique</button>
+                    <button onClick={() => handleNavCategory('watchlist')} className={`hover:text-white outline-none transition-colors ${currentCategory === 'watchlist' ? 'text-[#a855f7]' : ''}`}>Bibliothèque</button>
                   </nav>
                 </div>
                 
@@ -353,7 +400,7 @@
                       type="text" 
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Artistes, albums, sons..." 
+                      placeholder="Artistes, sons, albums..." 
                       className="bg-[#151520] border border-white/10 text-white text-xs px-4 py-2 rounded-full outline-none w-36 md:w-64 focus:border-[#a855f7] transition-colors shadow-inner"
                     />
                   </div>
@@ -371,7 +418,7 @@
               </header>
 
               {/* NAVBAR MOBILE */}
-              <nav className="lg:hidden fixed bottom-0 w-full z-50 bg-[#060608]/95 backdrop-blur-xl border-t border-white/5 flex justify-around items-center py-3 shadow-[0_-10px_20px_rgba(0,0,0,0.5)] pb-[env(safe-area-inset-bottom)]">
+              <nav className="lg:hidden fixed bottom-0 w-full z-40 bg-[#060608]/95 backdrop-blur-xl border-t border-white/5 flex justify-around items-center py-3 shadow-[0_-10px_20px_rgba(0,0,0,0.5)] pb-[env(safe-area-inset-bottom)]">
                 <button onClick={() => handleNavCategory('home')} className={`flex flex-col items-center gap-1 outline-none transition-colors ${currentCategory === 'home' ? 'text-[#a855f7]' : 'text-white/50 hover:text-white'}`}>
                   <Home className="w-5 h-5" /> <span className="text-[9px] font-bold uppercase tracking-widest">Accueil</span>
                 </button>
@@ -379,74 +426,89 @@
                   <Disc className="w-5 h-5" /> <span className="text-[9px] font-bold uppercase tracking-widest">Genres</span>
                 </button>
                 <button onClick={() => handleNavCategory('watchlist')} className={`flex flex-col items-center gap-1 outline-none transition-colors ${currentCategory === 'watchlist' ? 'text-[#a855f7]' : 'text-white/50 hover:text-white'}`}>
-                  <ListMusic className="w-5 h-5" /> <span className="text-[9px] font-bold uppercase tracking-widest">Ma Musique</span>
+                  <ListMusic className="w-5 h-5" /> <span className="text-[9px] font-bold uppercase tracking-widest">Biblio</span>
                 </button>
               </nav>
 
               {/* CONTENU PRINCIPAL */}
               {searchQuery ? (
                 <div className="pt-24 px-4 md:px-14 pb-24 relative z-30 min-h-screen">
-                  <h2 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest border-l-4 border-[#a855f7] pl-3">Résultats de recherche</h2>
+                  <h2 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest border-l-4 border-[#a855f7] pl-3">Recherche Mondiale</h2>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6 mt-6">
-                    {searchResults.length > 0 ? searchResults.map(album => (
-                        <div key={album.id} className="relative cursor-pointer group" onClick={() => setSelectedAlbum(album)}>
+                    {searchResults.length > 0 ? searchResults.map(track => (
+                        <div key={track.id} className="relative cursor-pointer group" onClick={() => handlePlayTrack(track)}>
                             <div className="rounded-2xl overflow-hidden shadow-lg border border-white/5 bg-[#151520] transition-transform duration-300 group-hover:scale-105 aspect-square">
-                                <img className="object-cover w-full h-full" src={album.image} loading="lazy" draggable="false" alt=""/>
+                                <img className="object-cover w-full h-full" src={track.image} loading="lazy" draggable="false" alt=""/>
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                     <div className="w-12 h-12 bg-[#a855f7] rounded-full flex items-center justify-center shadow-xl">
                                         <Play className="w-5 h-5 fill-white text-white ml-1" />
                                     </div>
                                 </div>
                             </div>
-                            <p className="text-white font-bold text-[11px] md:text-xs mt-3 truncate w-full">{album.name}</p>
-                            <p className="text-white/50 text-[9px] md:text-[10px] truncate w-full">{album.artist}</p>
+                            <p className="text-white font-bold text-[11px] md:text-xs mt-3 truncate w-full">{track.name}</p>
+                            <p className="text-white/50 text-[9px] md:text-[10px] truncate w-full">{track.artist}</p>
                         </div>
-                    )) : <p className="text-white/50 py-10 col-span-full text-center">Aucun résultat trouvé dans la base de données musicale mondiale.</p>}
+                    )) : <p className="text-white/50 py-10 col-span-full text-center">Aucun résultat trouvé sur YouTube / iTunes.</p>}
                   </div>
                 </div>
               ) : currentCategory === 'watchlist' ? (
-                <div className="pt-24 px-0 pb-24 min-h-screen">
-                  <h2 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest pl-4 md:pl-14 mb-6"><Bookmark className="w-6 h-6 text-[#a855f7] inline mr-2" /> Ma Musique</h2>
-                  {watchlistData.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-32 opacity-50">
+                <div className="pt-24 px-4 md:px-14 pb-24 min-h-screen max-w-7xl mx-auto">
+                  <div className="flex justify-between items-end mb-8">
+                      <h2 className="text-xl md:text-3xl font-black text-white uppercase tracking-widest"><Bookmark className="w-8 h-8 text-[#a855f7] inline mr-2" /> Ma Bibliothèque</h2>
+                      <button onClick={() => setShowPlaylistCreator(true)} className="px-5 py-2.5 bg-[#a855f7] text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:scale-105 transition-all shadow-[0_0_20px_rgba(168,85,247,0.4)] flex items-center gap-2">
+                          <Plus className="w-4 h-4" /> Nouvelle Playlist
+                      </button>
+                  </div>
+
+                  {userPlaylists.length > 0 && (
+                      <div className="mb-12">
+                          <h3 className="text-sm font-black uppercase tracking-[0.2em] border-l-4 border-[#a855f7] pl-3 mb-6 text-white/80">Mes Playlists</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {userPlaylists.map(pl => (
+                                  <div key={pl.id} className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition-colors cursor-pointer group flex items-center gap-4" onClick={() => setSelectedAlbum({ id: pl.id, name: pl.name, type: 'custom_playlist', tracks: pl.tracks, image: pl.tracks[0]?.image || 'https://via.placeholder.com/300/151520/a855f7?text=Playlist' })}>
+                                      <div className="w-16 h-16 rounded-xl bg-[#151520] border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                                          {pl.tracks.length > 0 ? <img src={pl.tracks[0].image || pl.tracks[0].coverArt} className="w-full h-full object-cover" alt="" /> : <ListMusic className="w-6 h-6 text-[#a855f7]" />}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                          <h4 className="font-black text-white text-sm md:text-base truncate">{pl.name}</h4>
+                                          <p className="text-xs text-white/50">{pl.tracks.length} titres</p>
+                                      </div>
+                                      <button onClick={(e) => { e.stopPropagation(); deletePlaylist(pl.id); }} className="p-2 opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-400 rounded-full transition-all">
+                                          <Trash2 className="w-4 h-4" />
+                                      </button>
+                                  </div>
+                              ))}
+                          </div>
+                      </div>
+                  )}
+
+                  {watchlistData.length === 0 && userPlaylists.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 opacity-50 border border-dashed border-white/20 rounded-3xl">
                         <ListMusic className="w-16 h-16 mb-4" />
                         <p className="text-sm uppercase tracking-widest font-bold">Votre bibliothèque est vide.</p>
+                        <p className="text-xs mt-2 text-center max-w-md">Ajoutez des albums ou créez des playlists pour les retrouver ici.</p>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6 px-4 md:px-14">
-                      {watchlistData.map(album => (
-                        <div key={album.id} className="relative cursor-pointer group" onClick={() => setSelectedAlbum(album)}>
-                            <div className="rounded-2xl overflow-hidden shadow-lg border border-white/5 bg-[#151520] transition-transform duration-300 group-hover:scale-105 aspect-square">
-                                <img className="object-cover w-full h-full" src={album.image} loading="lazy" draggable="false" alt=""/>
-                            </div>
-                            <p className="text-white font-bold text-[11px] md:text-xs mt-3 truncate w-full">{album.name}</p>
-                            <p className="text-white/50 text-[9px] md:text-[10px] truncate w-full">{album.artist}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  ) : null}
                 </div>
               ) : (
                 <>
-                  {/* BANNIÈRE ET LIGNES */}
-                  <MusicBanner onSelect={setSelectedAlbum} />
+                  <MusicBanner onSelect={setSelectedAlbum} onPlay={handlePlayTrack} />
                   
                   <main className="relative z-20 space-y-10 mt-6 md:-mt-10">
                       {currentCategory === 'home' && (
                           <>
-                              <MusicRow title="Hits du Moment" term="hits" onSelect={setSelectedAlbum} isLarge={true} />
-                              <MusicRow title="Rap & Hip-Hop" term="rap français" onSelect={setSelectedAlbum} />
-                              <MusicRow title="Pop Internationale" term="pop hits" onSelect={setSelectedAlbum} />
-                              <MusicRow title="Afrobeats & R&B" term="afrobeat rnb" onSelect={setSelectedAlbum} />
-                              <MusicRow title="Classiques" term="classique hits" onSelect={setSelectedAlbum} />
+                              <TrackRow title="Musiques du Moment (Singles)" term="hits 2026" onPlay={handlePlayTrack} />
+                              <MusicRow title="Albums Populaires" term="top" onSelect={setSelectedAlbum} isLarge={true} />
+                              <MusicRow title="Rap Français & US" term="rap" onSelect={setSelectedAlbum} />
+                              <MusicRow title="Pop & Hits" term="pop" onSelect={setSelectedAlbum} />
+                              <MusicRow title="R&B Classiques" term="rnb" onSelect={setSelectedAlbum} />
                           </>
                       )}
                       {currentCategory === 'playlists' && (
                           <>
-                              <MusicRow title="Électro & Dance" term="electro house" onSelect={setSelectedAlbum} isLarge={true}/>
-                              <MusicRow title="Détente & Lofi" term="lofi chill" onSelect={setSelectedAlbum} />
-                              <MusicRow title="Rock & Alternatif" term="rock" onSelect={setSelectedAlbum} />
-                              <MusicRow title="Acoustique" term="acoustic cover" onSelect={setSelectedAlbum} />
+                              {EXTENDED_GENRES.map((genre, idx) => (
+                                  <MusicRow key={idx} title={genre.title} term={genre.term} onSelect={setSelectedAlbum} isLarge={idx === 0}/>
+                              ))}
                           </>
                       )}
                   </main>
@@ -457,7 +519,6 @@
               {showSettings && (
                 <div className="fixed inset-0 z-[9000] flex justify-center items-center p-4 sm:p-8 bg-[#060608]/95 backdrop-blur-3xl overflow-hidden">
                     <div className="holo-card relative w-full max-w-3xl rounded-[2rem] p-6 md:p-8 flex flex-col text-center animate-in zoom-in duration-300 z-10 shadow-[0_0_80px_rgba(0,0,0,0.9)] max-h-[95vh] overflow-y-auto no-scrollbar">
-                        
                         <button onClick={() => setShowSettings(false)} className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/5 hover:bg-red-500 flex items-center justify-center text-white/50 hover:text-white transition-colors shadow-sm z-20 outline-none">
                             <X className="w-5 h-5" />
                         </button>
@@ -467,42 +528,24 @@
                                 <span className="text-4xl font-black text-[#a855f7]">{userName ? userName.charAt(0).toUpperCase() : 'U'}</span>
                             </div>
                             <h2 className="text-2xl font-black text-white uppercase tracking-widest mb-1 drop-shadow-md">{userName || 'Utilisateur'}</h2>
-                            
-                            <div className="px-5 py-2 mt-2 bg-white/5 text-white/80 rounded-full text-[10px] font-bold uppercase tracking-widest border border-[#a855f7]/30 flex items-center gap-2 shadow-md">
-                                <Star className="w-3 h-3 text-[#a855f7] fill-[#a855f7]" /> Écosystème LevelIA
-                            </div>
+                            <p className="text-xs text-white/50 font-mono mb-4">Abonné LevelUp</p>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full text-left">
-                            <div className="space-y-4">
-                                <h3 className="text-[10px] font-black text-[#a855f7] uppercase tracking-widest pl-2 border-l-2 border-[#a855f7]">Préférences Musicales</h3>
-                                
-                                <div className="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10 shadow-inner">
-                                    <span className="text-[11px] font-bold text-white/80 uppercase tracking-widest flex items-center gap-3"><Headphones className="w-4 h-4 text-[#a855f7]" /> Qualité Audio</span>
-                                    <span className="px-3 py-1 bg-white/10 text-white/70 rounded-lg text-[10px] font-black tracking-widest border border-white/10 uppercase">HQ (320kbps)</span>
+                        <div className="w-full mt-4 pt-6 border-t border-white/10 text-center bg-white/5 p-6 rounded-2xl">
+                            <span className="text-[11px] font-black text-[#a855f7] uppercase tracking-widest block mb-4 border-b border-[#a855f7]/30 pb-2 w-fit mx-auto">Nos Partenaires</span>
+                            <div className="flex justify-center items-center gap-8 opacity-90 flex-wrap">
+                                <div className="flex flex-col items-center gap-2">
+                                   <Music className="w-6 h-6 text-[#fa243c]" />
+                                   <span className="text-[10px] font-black tracking-widest uppercase">Apple Music</span>
                                 </div>
-
-                                <div className="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10 shadow-inner">
-                                    <span className="text-[11px] font-bold text-white/80 uppercase tracking-widest flex items-center gap-3"><Bookmark className="w-4 h-4 text-[#a855f7]" /> Albums Sauvegardés</span>
-                                    <span className="px-3 py-1 bg-[#a855f7]/20 text-[#a855f7] rounded-lg text-xs font-bold border border-[#a855f7]/30">{watchlist.length}</span>
+                                <div className="flex flex-col items-center gap-2">
+                                   <Play className="w-6 h-6 text-[#ff0000] fill-[#ff0000]" />
+                                   <span className="text-[10px] font-black tracking-widest uppercase">YouTube API</span>
                                 </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <h3 className="text-[10px] font-black text-[#a855f7] uppercase tracking-widest pl-2 border-l-2 border-[#a855f7]">Système</h3>
-                                
-                                <div className="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10 shadow-inner">
-                                    <span className="text-[11px] font-bold text-white/80 uppercase tracking-widest flex items-center gap-3"><HardDrive className="w-4 h-4 text-[#a855f7]" /> Cache de Lecture</span>
-                                    <button onClick={() => showToast("Cache musical nettoyé.", 'success')} className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-[10px] font-bold uppercase hover:bg-red-500 hover:text-white transition-all border border-red-500/30 outline-none">Vider</button>
+                                <div className="flex flex-col items-center gap-2">
+                                   <Cloud className="w-6 h-6 text-[#ff7700] fill-[#ff7700]" />
+                                   <span className="text-[10px] font-black tracking-widest uppercase">SoundCloud</span>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div className="w-full mt-8 pt-6 border-t border-white/10 text-center">
-                            <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest block mb-4">Moteur de données</span>
-                            <div className="flex justify-center items-center gap-6 opacity-80 flex-wrap">
-                                <span className="text-sm font-black tracking-widest text-[#fa243c]">Apple Music API</span>
-                                <span className="text-sm font-black tracking-widest text-[#ff0000]">YouTube Data</span>
                             </div>
                         </div>
                         
@@ -519,9 +562,23 @@
                                 </div>
                             </div>
                         )}
-                        <p className="text-[9px] text-white/20 uppercase tracking-widest mt-6">LevelMusic • Architecture V1.0</p>
+                        <p className="text-[9px] text-white/20 uppercase tracking-widest mt-6">LevelMusic • Architecture V3.0 (True Engine)</p>
                     </div>
                 </div>
+              )}
+
+              {/* MODAL CRÉATEUR DE PLAYLIST */}
+              {showPlaylistCreator && (
+                  <div className="fixed inset-0 z-[9500] flex justify-center items-center p-4 bg-black/90 backdrop-blur-xl">
+                      <div className="holo-card w-full max-w-sm p-8 rounded-[2rem] shadow-2xl animate-in zoom-in">
+                          <h3 className="text-lg font-black uppercase tracking-widest mb-6 text-center text-white">Nouvelle Playlist</h3>
+                          <input type="text" id="playlistNameInput" placeholder="Nom de la playlist..." className="w-full bg-[#151520] border border-white/20 rounded-xl px-4 py-3 text-sm text-white focus:border-[#a855f7] outline-none mb-6 transition-colors" autoFocus />
+                          <div className="flex gap-3">
+                              <button onClick={() => setShowPlaylistCreator(false)} className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold uppercase transition-colors">Annuler</button>
+                              <button onClick={() => createPlaylist(document.getElementById('playlistNameInput').value)} className="flex-1 py-3 rounded-xl bg-[#a855f7] text-white text-xs font-black uppercase shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:scale-105 transition-transform">Créer</button>
+                          </div>
+                      </div>
+                  </div>
               )}
 
               {/* MODALE ALBUM / PLAYLIST */}
@@ -529,27 +586,35 @@
                   <MusicModal 
                       item={selectedAlbum} 
                       onClose={() => setSelectedAlbum(null)} 
-                      onPlay={(track, img) => setCurrentTrack({...track, coverArt: img})}
-                      isAdded={watchlist.includes(selectedAlbum.id)}
-                      toggleWatchlist={() => toggleWatchlist(selectedAlbum)}
+                      onPlay={(track, queueList, index) => handlePlayTrack(track, queueList, index)}
+                      userPlaylists={userPlaylists}
+                      onAddToPlaylist={addTrackToPlaylist}
+                      showToast={showToast}
                   />
               )}
 
-              {/* LECTEUR AUDIO FIXE (La magie Youtube Invisible) */}
-              <BottomPlayer track={currentTrack} onClose={() => setCurrentTrack(null)} />
+              {/* VRAI LECTEUR AUDIO AVEC PROGRESSION (YouTube Iframe API) */}
+              <AudioEngine 
+                  track={currentTrack} 
+                  queue={queue}
+                  queueIndex={queueIndex}
+                  onNext={handleNextTrack}
+                  onPrev={handlePrevTrack}
+                  onClose={() => setCurrentTrack(null)} 
+              />
             </div>
           );
         }
 
         // =========================================================================
-        // COMPOSANTS API APPLE MUSIC / ITUNES (100% GRATUIT, SANS CLÉ)
+        // COMPOSANTS UI
         // =========================================================================
 
-        function MusicBanner({ onSelect }) {
+        function MusicBanner({ onSelect, onPlay }) {
           const [hero, setHero] = useState(null);
           
           useEffect(() => {
-              fetch('https://itunes.apple.com/search?term=album&entity=album&limit=25&country=FR')
+              fetch('https://itunes.apple.com/search?term=album&entity=album&limit=50&country=FR')
               .then(r=>r.json())
               .then(data => {
                   if (data.results && data.results.length > 0) {
@@ -580,37 +645,36 @@
                     </h1>
                     <p className="text-lg md:text-xl text-white/70 font-medium mb-8">Par <span className="text-[#a855f7]">{hero.artist}</span></p>
                     
-                    <button onClick={() => onSelect(hero)} className="w-fit flex items-center gap-3 px-8 py-4 bg-[#a855f7] text-white rounded-xl font-black uppercase tracking-widest hover:scale-105 transition-transform shadow-[0_0_30px_rgba(168,85,247,0.4)] outline-none">
-                        <Headphones className="w-5 h-5" /> Écouter l'album
-                    </button>
+                    <div className="flex gap-4">
+                        <button onClick={() => onSelect(hero)} className="w-fit flex items-center gap-3 px-8 py-4 bg-[#a855f7] text-white rounded-xl font-black uppercase tracking-widest hover:scale-105 transition-transform shadow-[0_0_30px_rgba(168,85,247,0.4)] outline-none">
+                            <Headphones className="w-5 h-5" /> Voir l'album
+                        </button>
+                    </div>
                 </div>
             </header>
           );
         }
 
-        function MusicRow({ title, term, onSelect, isLarge }) {
+        function TrackRow({ title, term, onPlay }) {
           const [items, setItems] = useState([]);
           const rowRef = useRef(null);
 
           useEffect(() => {
-              fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=album&limit=25&country=FR`)
+              fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&limit=50&country=FR`)
               .then(r=>r.json())
               .then(data => {
                   const formatted = data.results.map(r => ({
-                      id: r.collectionId,
-                      name: r.collectionName,
-                      artist: r.artistName,
-                      image: r.artworkUrl100.replace('100x100bb', '600x600bb') 
+                      id: r.trackId, name: r.trackName, artist: r.artistName, coverArt: r.artworkUrl100.replace('100x100bb', '600x600bb') 
                   }));
-                  setItems(formatted);
+                  // Retire les doublons
+                  const unique = Array.from(new Set(formatted.map(a => a.name))).map(name => formatted.find(a => a.name === name));
+                  setItems(unique);
               }).catch(()=>{});
           }, [term]);
 
           if (items.length === 0) return null;
 
-          const scrollAction = (dir) => {
-              if (rowRef.current) rowRef.current.scrollBy({ left: dir === 'left' ? -300 : 300, behavior: 'smooth' });
-          }
+          const scrollAction = (dir) => { if (rowRef.current) rowRef.current.scrollBy({ left: dir === 'left' ? -300 : 300, behavior: 'smooth' }); }
 
           let isDown = false;
           let startX;
@@ -628,11 +692,70 @@
           return (
             <div className="group relative ml-4 md:ml-12">
                 <h2 className="text-white/90 text-[13px] md:text-lg font-black mb-4 uppercase tracking-[0.2em] border-l-4 border-[#a855f7] pl-3 md:pl-4">{title}</h2>
-                
-                <div onClick={() => scrollAction('left')} className="absolute left-0 top-12 bottom-0 z-40 w-10 bg-gradient-to-r from-[#060608] via-[#060608]/80 to-transparent opacity-0 md:group-hover:opacity-100 flex items-center justify-start cursor-pointer transition-opacity duration-300 -ml-4 md:-ml-12 hidden md:flex outline-none">
-                    <ChevronLeft className="text-white hover:text-[#a855f7] transition-colors w-10 h-10 ml-1 drop-shadow-lg" />
+                <div onClick={() => scrollAction('left')} className="absolute left-0 top-12 bottom-0 z-40 w-10 bg-gradient-to-r from-[#060608] via-[#060608]/80 to-transparent opacity-0 md:group-hover:opacity-100 flex items-center justify-start cursor-pointer transition-opacity duration-300 -ml-4 md:-ml-12 hidden md:flex outline-none"><ChevronLeft className="text-white hover:text-[#a855f7] transition-colors w-10 h-10 ml-1 drop-shadow-lg" /></div>
+                <div 
+                  ref={rowRef} 
+                  onMouseDown={handleMouseDown} onMouseLeave={handleMouseLeave} onMouseUp={handleMouseUp} onMouseMove={handleMouseMove}
+                  className="flex overflow-x-scroll py-2 md:py-4 space-x-3 md:space-x-5 no-scrollbar cursor-grab active:cursor-grabbing pr-8"
+                >
+                    {items.map((item, idx) => (
+                          <div key={item.id} className="relative flex-none cursor-pointer group" onClick={() => onPlay(item, items, idx)}>
+                              <div className={`rounded-full overflow-hidden shadow-lg border-2 border-[#a855f7]/20 bg-[#151520] transition-transform duration-300 group-hover:scale-105 w-[110px] md:w-[150px] h-[110px] md:h-[150px] mx-auto`}>
+                                  <img className="object-cover w-full h-full" src={item.coverArt} loading="lazy" draggable="false" alt=""/>
+                                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                      <div className="w-10 h-10 bg-[#a855f7] rounded-full flex items-center justify-center shadow-xl">
+                                          <Play className="w-4 h-4 fill-white text-white ml-1" />
+                                      </div>
+                                  </div>
+                              </div>
+                              <p className="text-white font-bold text-[11px] md:text-xs mt-3 text-center truncate w-[110px] md:w-[150px]">{item.name}</p>
+                              <p className="text-white/50 text-[9px] md:text-[10px] text-center truncate w-[110px] md:w-[150px]">{item.artist}</p>
+                          </div>
+                    ))}
                 </div>
+                <div onClick={() => scrollAction('right')} className="absolute right-0 top-12 bottom-0 z-40 w-12 bg-gradient-to-l from-[#060608] via-[#060608]/80 to-transparent opacity-0 md:group-hover:opacity-100 flex items-center justify-end cursor-pointer transition-opacity duration-300 hidden md:flex outline-none"><ChevronRight className="text-white hover:text-[#a855f7] transition-colors w-10 h-10 mr-2 drop-shadow-lg" /></div>
+            </div>
+          )
+        }
 
+        function MusicRow({ title, term, onSelect, isLarge }) {
+          const [items, setItems] = useState([]);
+          const rowRef = useRef(null);
+
+          useEffect(() => {
+              fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=album&limit=50&country=FR`)
+              .then(r=>r.json())
+              .then(data => {
+                  const formatted = data.results.map(r => ({
+                      id: r.collectionId, name: r.collectionName, artist: r.artistName, image: r.artworkUrl100.replace('100x100bb', '600x600bb') 
+                  }));
+                  // Retire les doublons
+                  const unique = Array.from(new Set(formatted.map(a => a.id))).map(id => formatted.find(a => a.id === id));
+                  setItems(unique);
+              }).catch(()=>{});
+          }, [term]);
+
+          if (items.length === 0) return null;
+
+          const scrollAction = (dir) => { if (rowRef.current) rowRef.current.scrollBy({ left: dir === 'left' ? -300 : 300, behavior: 'smooth' }); }
+
+          let isDown = false;
+          let startX;
+          let scrollLeft;
+          const handleMouseDown = (e) => { isDown = true; startX = e.pageX - rowRef.current.offsetLeft; scrollLeft = rowRef.current.scrollLeft; };
+          const handleMouseLeave = () => { isDown = false; };
+          const handleMouseUp = () => { isDown = false; };
+          const handleMouseMove = (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - rowRef.current.offsetLeft;
+            rowRef.current.scrollLeft = scrollLeft - (x - startX) * 2;
+          };
+
+          return (
+            <div className="group relative ml-4 md:ml-12">
+                <h2 className="text-white/90 text-[13px] md:text-lg font-black mb-4 uppercase tracking-[0.2em] border-l-4 border-[#a855f7] pl-3 md:pl-4">{title}</h2>
+                <div onClick={() => scrollAction('left')} className="absolute left-0 top-12 bottom-0 z-40 w-10 bg-gradient-to-r from-[#060608] via-[#060608]/80 to-transparent opacity-0 md:group-hover:opacity-100 flex items-center justify-start cursor-pointer transition-opacity duration-300 -ml-4 md:-ml-12 hidden md:flex outline-none"><ChevronLeft className="text-white hover:text-[#a855f7] transition-colors w-10 h-10 ml-1 drop-shadow-lg" /></div>
                 <div 
                   ref={rowRef} 
                   onMouseDown={handleMouseDown} onMouseLeave={handleMouseLeave} onMouseUp={handleMouseUp} onMouseMove={handleMouseMove}
@@ -656,20 +779,23 @@
                       )
                     })}
                 </div>
-
-                <div onClick={() => scrollAction('right')} className="absolute right-0 top-12 bottom-0 z-40 w-12 bg-gradient-to-l from-[#060608] via-[#060608]/80 to-transparent opacity-0 md:group-hover:opacity-100 flex items-center justify-end cursor-pointer transition-opacity duration-300 hidden md:flex outline-none">
-                    <ChevronRight className="text-white hover:text-[#a855f7] transition-colors w-10 h-10 mr-2 drop-shadow-lg" />
-                </div>
+                <div onClick={() => scrollAction('right')} className="absolute right-0 top-12 bottom-0 z-40 w-12 bg-gradient-to-l from-[#060608] via-[#060608]/80 to-transparent opacity-0 md:group-hover:opacity-100 flex items-center justify-end cursor-pointer transition-opacity duration-300 hidden md:flex outline-none"><ChevronRight className="text-white hover:text-[#a855f7] transition-colors w-10 h-10 mr-2 drop-shadow-lg" /></div>
             </div>
           )
         }
 
-        // --- MODALE DES PISTES (TRACKLIST) ET INFOS ALBUM ---
-        function MusicModal({ item, onClose, onPlay, isAdded, toggleWatchlist }) {
+        function MusicModal({ item, onClose, onPlay, userPlaylists, onAddToPlaylist, showToast }) {
             const [tracks, setTracks] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [activeMenu, setActiveMenu] = useState(null);
 
             useEffect(() => {
+                if (item.type === 'custom_playlist') {
+                    setTracks(item.tracks.map(t => ({ trackId: t.id, trackName: t.name, artistName: t.artist, trackTimeMillis: t.duration_ms || 180000, coverArt: t.coverArt || t.image })));
+                    setLoading(false);
+                    return;
+                }
+
                 const fetchTracks = async () => {
                     try {
                         const res = await fetch(`https://itunes.apple.com/lookup?id=${item.id}&entity=song&country=FR`);
@@ -680,7 +806,7 @@
                     } catch(e) { setLoading(false); }
                 };
                 fetchTracks();
-            }, [item.id]);
+            }, [item.id, item.type]);
 
             const formatDuration = (ms) => {
                 if(!ms) return "0:00";
@@ -689,49 +815,77 @@
                 return minutes + ":" + (seconds < 10 ? '0' : '') + seconds;
             };
 
+            const playAll = () => {
+                if(tracks.length === 0) return;
+                const queueList = tracks.map(t => ({ id: t.trackId, name: t.trackName, artist: t.artistName, coverArt: t.coverArt || item.image }));
+                onPlay(queueList[0], queueList, 0);
+            };
+
             return (
                 <div className="fixed inset-0 z-[8000] flex justify-center items-center p-0 md:p-6 bg-black/90 backdrop-blur-2xl">
-                    <div className="holo-card relative w-full h-[100vh] md:h-[90vh] max-w-5xl md:rounded-[2rem] flex flex-col md:flex-row overflow-hidden shadow-2xl animate-in slide-in-from-bottom md:zoom-in">
-                        <button onClick={onClose} className="absolute top-4 right-4 z-50 p-2 bg-black/50 hover:bg-red-500 rounded-full text-white transition-colors outline-none border border-white/10">
+                    <div className="holo-card relative w-full h-[100vh] md:h-[90vh] max-w-5xl md:rounded-[2rem] flex flex-col md:flex-row overflow-hidden shadow-2xl animate-in slide-in-from-bottom md:zoom-in" onClick={() => setActiveMenu(null)}>
+                        <button onClick={onClose} className="absolute top-4 right-4 z-50 p-2 bg-black/50 hover:bg-red-500 rounded-full text-white transition-colors outline-none border border-white/10 shadow-lg">
                             <X className="w-5 h-5" />
                         </button>
 
                         <div className="w-full md:w-2/5 bg-[#0a0a0f] p-8 flex flex-col items-center justify-center border-r border-white/5 relative">
-                            {/* Flou artistique en arrière plan */}
                             <div className="absolute inset-0 opacity-20 blur-[60px]" style={{ backgroundImage: `url("${item.image}")`, backgroundSize: 'cover' }}></div>
                             
                             <img src={item.image} className="relative z-10 w-56 h-56 md:w-64 md:h-64 object-cover rounded-2xl shadow-[0_0_50px_rgba(168,85,247,0.3)] mb-6" draggable="false" alt=""/>
                             <h2 className="relative z-10 text-2xl font-black text-center uppercase tracking-widest">{item.name}</h2>
-                            <p className="relative z-10 text-[#a855f7] font-bold mt-2 text-sm">{item.artist}</p>
+                            {item.artist && <p className="relative z-10 text-[#a855f7] font-bold mt-2 text-sm">{item.artist}</p>}
                             
                             <div className="relative z-10 flex gap-4 mt-8 w-full">
-                                <button onClick={toggleWatchlist} className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all active:scale-95 outline-none ${isAdded ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-white/5 border-white/20 text-white/80 hover:bg-white/10'}`}>
-                                    {isAdded ? <CheckCircle className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                                    <span className="text-[10px] font-bold uppercase tracking-widest">{isAdded ? 'Sauvegardé' : 'Ajouter'}</span>
-                                </button>
-                                <button className="flex items-center justify-center px-4 py-3 rounded-xl border border-white/20 bg-white/5 text-white/80 hover:text-white hover:bg-white/10 transition-all active:scale-95 outline-none">
-                                    <Share2 className="w-5 h-5 text-[#a855f7]" />
+                                <button onClick={playAll} className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#a855f7] text-white shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:scale-105 transition-all active:scale-95 outline-none font-black uppercase text-xs tracking-widest`}>
+                                    <Play className="w-4 h-4 fill-white" /> Tout Lire
                                 </button>
                             </div>
                         </div>
 
-                        <div className="w-full md:w-3/5 p-6 md:p-8 overflow-y-auto no-scrollbar bg-black/40 pb-28">
-                            <h3 className="text-lg font-black uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-white/10 pb-4"><Disc className="w-5 h-5 text-[#a855f7]" /> Liste des titres</h3>
+                        <div className="w-full md:w-3/5 p-6 md:p-8 overflow-y-auto no-scrollbar bg-black/40 pb-28 relative">
+                            <h3 className="text-lg font-black uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-white/10 pb-4"><ListOrdered className="w-5 h-5 text-[#a855f7]" /> {tracks.length} Titres</h3>
                             
                             {loading ? (
                                 <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#a855f7]"></div></div>
                             ) : (
                                 <div className="space-y-2">
                                     {tracks.map((track, idx) => {
+                                        const isMenuOpen = activeMenu === track.trackId;
                                         return (
-                                            <div key={track.trackId} onClick={() => onPlay({name: track.trackName, artist: track.artistName}, item.image)} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 cursor-pointer group transition-all border border-transparent hover:border-white/5">
-                                                <span className="w-6 text-center text-white/30 text-xs font-mono group-hover:hidden">{idx + 1}</span>
-                                                <Play className="w-6 h-6 text-[#a855f7] hidden group-hover:block ml-1" />
-                                                <div className="flex-1 min-w-0">
+                                            <div key={track.trackId} className="relative flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 group transition-all border border-transparent hover:border-white/5">
+                                                <div className="w-8 flex justify-center cursor-pointer" onClick={() => {
+                                                    const queueList = tracks.map(t => ({ id: t.trackId, name: t.trackName, artist: t.artistName, coverArt: t.coverArt || item.image }));
+                                                    onPlay(queueList[idx], queueList, idx);
+                                                }}>
+                                                    <span className="text-white/30 text-xs font-mono group-hover:hidden">{idx + 1}</span>
+                                                    <Play className="w-5 h-5 text-[#a855f7] hidden group-hover:block" />
+                                                </div>
+                                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => {
+                                                    const queueList = tracks.map(t => ({ id: t.trackId, name: t.trackName, artist: t.artistName, coverArt: t.coverArt || item.image }));
+                                                    onPlay(queueList[idx], queueList, idx);
+                                                }}>
                                                     <p className="text-white font-bold text-[13px] truncate">{track.trackName}</p>
                                                     <p className="text-white/50 text-[10px] truncate">{track.artistName}</p>
                                                 </div>
-                                                <span className="text-white/40 text-[10px] font-mono">{formatDuration(track.trackTimeMillis)}</span>
+                                                <span className="text-white/40 text-[10px] font-mono mr-2">{formatDuration(track.trackTimeMillis)}</span>
+                                                
+                                                {userPlaylists && (
+                                                    <button onClick={(e) => { e.stopPropagation(); setActiveMenu(isMenuOpen ? null : track.trackId); }} className="p-1 opacity-0 group-hover:opacity-100 hover:text-white text-white/50 transition-all outline-none relative z-10">
+                                                        <MoreVertical className="w-4 h-4" />
+                                                    </button>
+                                                )}
+
+                                                {isMenuOpen && (
+                                                    <div className="absolute right-10 top-8 w-48 bg-[#151520] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in zoom-in p-1">
+                                                        <div className="px-3 py-2 border-b border-white/10 text-[10px] font-black uppercase tracking-widest text-white/40">Ajouter à...</div>
+                                                        {userPlaylists.length === 0 && <div className="px-3 py-3 text-xs text-white/50 text-center">Aucune playlist</div>}
+                                                        {userPlaylists.map(pl => (
+                                                            <div key={pl.id} onClick={(e) => { e.stopPropagation(); onAddToPlaylist(pl.id, {id: track.trackId, name: track.trackName, artist: track.artistName, coverArt: track.coverArt || item.image}); setActiveMenu(null); }} className="px-3 py-2.5 text-xs text-white hover:bg-[#a855f7] hover:text-white cursor-pointer rounded-lg transition-colors truncate">
+                                                                {pl.name}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                         )
                                     })}
@@ -743,45 +897,165 @@
             )
         }
 
-        // --- LECTEUR AUDIO SECRET (YOUTUBE INVISIBLE) ---
-        function BottomPlayer({ track, onClose }) {
-            if (!track) return null;
-            
-            const query = encodeURIComponent(`${track.artist} ${track.name} audio`);
-            const ytUrl = `https://www.youtube.com/embed?listType=search&list=${query}&autoplay=1`;
-            
-            return (
-                <div className="fixed bottom-[env(safe-area-inset-bottom)] md:bottom-0 left-0 w-full h-20 md:h-24 bg-[#0a0a0f]/95 backdrop-blur-2xl border-t border-[#a855f7]/30 flex items-center justify-between px-4 md:px-8 z-[9999] shadow-[0_-20px_50px_rgba(0,0,0,0.6)] animate-in slide-in-from-bottom">
-                    
-                    <div className="flex items-center gap-3 md:gap-4 w-[45%] md:w-1/3 overflow-hidden">
-                        <img src={track.coverArt} className="w-12 h-12 md:w-16 md:h-16 rounded-xl shadow-lg border border-white/10" draggable="false" alt=""/>
-                        <div className="truncate">
-                            <p className="text-white font-black text-[11px] md:text-sm truncate drop-shadow-md">{track.name}</p>
-                            <p className="text-white/60 text-[9px] md:text-xs truncate">{track.artist}</p>
-                        </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-center gap-4 md:gap-8 w-[10%] md:w-1/3">
-                        <button className="text-white/40 hover:text-[#a855f7] transition-colors hidden sm:block outline-none"><Rewind className="w-5 h-5 fill-current" /></button>
-                        <div className="w-10 h-10 md:w-14 md:h-14 bg-gradient-to-tr from-[#8b5cf6] to-[#a855f7] rounded-full flex items-center justify-center shadow-[0_0_25px_rgba(168,85,247,0.5)] border border-white/20">
-                            <div className="flex gap-1 items-end justify-center h-3 md:h-4">
-                                <div className="w-0.5 md:w-1 bg-white rounded-full animate-[bounce_1s_infinite] h-full"></div>
-                                <div className="w-0.5 md:w-1 bg-white rounded-full animate-[bounce_1.2s_infinite] h-2/3"></div>
-                                <div className="w-0.5 md:w-1 bg-white rounded-full animate-[bounce_0.8s_infinite] h-4/5"></div>
-                            </div>
-                        </div>
-                        <button className="text-white/40 hover:text-[#a855f7] transition-colors hidden sm:block outline-none"><FastForward className="w-5 h-5 fill-current" /></button>
-                    </div>
-                    
-                    <div className="flex items-center justify-end w-[45%] md:w-1/3 gap-3 md:gap-4">
-                         <span className="text-[#a855f7] font-bold text-[9px] md:text-[10px] uppercase tracking-widest hidden sm:block">Lecture en cours</span>
-                         <button onClick={onClose} className="p-2 md:p-2.5 rounded-full bg-white/5 hover:bg-red-500 hover:text-white transition-colors border border-white/10 outline-none">
-                             <X className="w-3 h-3 md:w-4 md:h-4" />
-                         </button>
-                    </div>
+        // =========================================================================
+        // LECTEUR AUDIO VRAI MOTEUR (YouTube Iframe API + Progression) - CORRIGÉ
+        // =========================================================================
+        function AudioEngine({ track, queue, queueIndex, onNext, onPrev, onClose }) {
+            const playerRef = useRef(null);
+            const [isPlaying, setIsPlaying] = useState(false);
+            const [progress, setProgress] = useState(0);
+            const [duration, setDuration] = useState(0);
+            const [currentTime, setCurrentTime] = useState(0);
+            const [isReady, setIsReady] = useState(false);
 
-                    {/* L'iframe Youtube magique */}
-                    <iframe src={ytUrl} className="hidden" allow="autoplay; encrypted-media"></iframe>
+            const onNextRef = useRef(onNext);
+            useEffect(() => { onNextRef.current = onNext; }, [onNext]);
+
+            useEffect(() => {
+                if (!window.YT) {
+                    const tag = document.createElement('script');
+                    tag.src = "https://www.youtube.com/iframe_api";
+                    document.body.appendChild(tag);
+                    window.onYouTubeIframeAPIReady = initPlayer;
+                } else if (!playerRef.current) {
+                    initPlayer();
+                }
+
+                function initPlayer() {
+                    // On s'assure que le conteneur existe
+                    if (document.getElementById('yt-player-container')) {
+                        playerRef.current = new window.YT.Player('yt-player-container', {
+                            height: '1', width: '1',
+                            playerVars: { autoplay: 1, controls: 0, playsinline: 1, rel: 0, modestbranding: 1 },
+                            events: {
+                                onReady: () => setIsReady(true),
+                                onStateChange: (event) => {
+                                    if (event.data === window.YT.PlayerState.PLAYING) {
+                                        setIsPlaying(true);
+                                        if (playerRef.current && playerRef.current.getDuration) {
+                                            setDuration(playerRef.current.getDuration());
+                                        }
+                                    } else if (event.data === window.YT.PlayerState.PAUSED) {
+                                        setIsPlaying(false);
+                                    } else if (event.data === window.YT.PlayerState.ENDED) {
+                                        setIsPlaying(false);
+                                        if (onNextRef.current) onNextRef.current();
+                                    }
+                                },
+                                onError: () => {
+                                    if (onNextRef.current) onNextRef.current();
+                                }
+                            }
+                        });
+                    }
+                }
+            }, []);
+
+            useEffect(() => {
+                if (isReady && track && playerRef.current && playerRef.current.loadPlaylist) {
+                    const query = `${track.artist} ${track.name} official audio`;
+                    playerRef.current.loadPlaylist({list: query, listType: 'search'});
+                    setIsPlaying(true);
+                    setProgress(0);
+                    setCurrentTime(0);
+                }
+            }, [track, isReady]);
+
+            useEffect(() => {
+                let interval;
+                if (isPlaying) {
+                    interval = setInterval(() => {
+                        if (playerRef.current && playerRef.current.getCurrentTime) {
+                            const time = playerRef.current.getCurrentTime();
+                            const dur = playerRef.current.getDuration() || 1;
+                            setCurrentTime(time);
+                            setProgress((time / dur) * 100);
+                        }
+                    }, 500);
+                }
+                return () => clearInterval(interval);
+            }, [isPlaying]);
+
+            const togglePlay = () => {
+                if (!isReady || !playerRef.current) return;
+                if (isPlaying) { playerRef.current.pauseVideo(); }
+                else { playerRef.current.playVideo(); }
+            };
+
+            const handleSeek = (e) => {
+                const newPercent = parseFloat(e.target.value);
+                setProgress(newPercent);
+                if (playerRef.current && duration > 0 && playerRef.current.seekTo) {
+                    const newTime = (newPercent / 100) * duration;
+                    playerRef.current.seekTo(newTime, true);
+                    setCurrentTime(newTime);
+                }
+            };
+
+            const formatTime = (seconds) => {
+                if (!seconds || isNaN(seconds)) return "0:00";
+                const m = Math.floor(seconds / 60);
+                const s = Math.floor(seconds % 60);
+                return `${m}:${s < 10 ? '0' : ''}${s}`;
+            };
+
+            return (
+                <div className={track ? "fixed bottom-[env(safe-area-inset-bottom)] md:bottom-0 left-0 w-full bg-[#0a0a0f]/95 backdrop-blur-3xl border-t border-[#a855f7]/30 z-[9999] shadow-[0_-20px_50px_rgba(0,0,0,0.8)] animate-in slide-in-from-bottom pb-2 pt-2 md:pb-0 md:pt-0" : "hidden"}>
+                    
+                    {/* LE LECTEUR CACHÉ ISOLÉ */}
+                    <div style={{position: 'absolute', opacity: 0, pointerEvents: 'none', width: '1px', height: '1px'}} dangerouslySetInnerHTML={{ __html: '<div id="yt-player-container"></div>' }}></div>
+
+                    {track && (
+                        <>
+                            <div className="absolute top-0 left-0 w-full h-1 bg-white/10 md:hidden">
+                                 <div className="h-full bg-[#a855f7] transition-all" style={{width: `${progress}%`}}></div>
+                            </div>
+
+                            <div className="flex items-center justify-between px-4 md:px-8 h-20 md:h-24">
+                                <div className="flex items-center gap-3 md:gap-4 w-1/3 overflow-hidden">
+                                    <img src={track.coverArt || "https://via.placeholder.com/150"} className="w-12 h-12 md:w-16 md:h-16 rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/10" draggable="false" alt=""/>
+                                    <div className="truncate hidden sm:block">
+                                        <p className="text-white font-black text-xs md:text-sm truncate drop-shadow-md">{track.name}</p>
+                                        <p className="text-white/60 text-[10px] md:text-xs truncate">{track.artist}</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex flex-col items-center justify-center w-1/3 max-w-[400px]">
+                                    <div className="flex items-center justify-center gap-6 mb-2">
+                                        <button onClick={onPrev} className={`text-white/60 hover:text-white transition-colors outline-none ${queueIndex === 0 ? 'opacity-30 cursor-not-allowed' : ''}`} disabled={queueIndex === 0}>
+                                            <Rewind className="w-5 h-5 fill-current" />
+                                        </button>
+                                        
+                                        <button onClick={togglePlay} className="w-12 h-12 md:w-14 md:h-14 bg-white rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:scale-105 transition-transform outline-none">
+                                            {isPlaying ? <Pause className="w-6 h-6 fill-black text-black" /> : <Play className="w-6 h-6 fill-black text-black ml-1" />}
+                                        </button>
+                                        
+                                        <button onClick={onNext} className={`text-white/60 hover:text-white transition-colors outline-none ${queueIndex === queue?.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}`} disabled={queueIndex === queue?.length - 1}>
+                                            <FastForward className="w-5 h-5 fill-current" />
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="hidden md:flex w-full items-center gap-3">
+                                        <span className="text-[10px] font-mono text-white/50 w-8 text-right">{formatTime(currentTime)}</span>
+                                        <input 
+                                            type="range" min="0" max="100" value={progress || 0} onChange={handleSeek}
+                                            className="flex-1"
+                                        />
+                                        <span className="text-[10px] font-mono text-white/50 w-8">{formatTime(duration)}</span>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex items-center justify-end w-1/3 gap-3 md:gap-4">
+                                     <div className="hidden lg:flex items-center gap-2 mr-4 text-xs font-bold text-white/40 uppercase tracking-widest border border-white/10 px-3 py-1.5 rounded-lg bg-black/50">
+                                         <ListOrdered className="w-4 h-4 text-[#a855f7]" /> {queueIndex + 1} / {queue?.length || 1}
+                                     </div>
+                                     <button onClick={() => { onClose(); setIsPlaying(false); if(playerRef.current && playerRef.current.stopVideo) playerRef.current.stopVideo(); }} className="p-2 md:p-2.5 rounded-full bg-white/5 hover:bg-red-500 hover:text-white transition-colors border border-white/10 outline-none">
+                                         <X className="w-4 h-4" />
+                                     </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             )
         }
