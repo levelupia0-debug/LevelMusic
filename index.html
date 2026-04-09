@@ -214,28 +214,165 @@ import {
   Heart, MoreHorizontal, ChevronDown, X, Plus, ListPlus, ListMusic,
   Share2, Mic2, Volume2, VolumeX, Shuffle, Repeat, Repeat1,
   Music, Network, LogOut, Settings, ArrowLeft, Disc, Radio,
-  Clock, PlayCircle, CheckCircle, ChevronRight, Headphones
+  Clock, PlayCircle, CheckCircle, ChevronRight, Headphones, Globe, ExternalLink
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, addDoc } from 'firebase/firestore';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, collectionGroup, getDocs } from 'firebase/firestore';
 
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+const firebaseConfig = {
   apiKey: "AIzaSyA3JgvNu5p-43037jvm4WRDaJHI9ES7uGM",
   authDomain: "levelup-ia.firebaseapp.com",
   projectId: "levelup-ia",
   storageBucket: "levelup-ia.firebasestorage.app",
   messagingSenderId: "229420004282",
-  appId: "1:229420004282:web:6735f059a947f0936ae383"
+  appId: "1:229420004282:web:6735f059a947f0936ae383",
+  measurementId: "G-MSRDY2574K"
 };
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
 const db = getFirestore(fbApp);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'level-ia-premium';
+const appId = 'level-ia-premium';
 
-// ─── LOGO (intouché) ───────────────────────────────────────────────
+// ─── DICTIONNAIRE DE TRADUCTIONS (i18n) ────────────────────────────
+const i18n = {
+  fr: {
+    greetingMor: "Bonjour 👋",
+    greetingAft: "Bon après-midi",
+    greetingEve: "Bonsoir 🌙",
+    whatToListen: "Qu'est-ce qu'on écoute aujourd'hui ?",
+    recent: "Écoutés récemment",
+    loadingCat: "Chargement du catalogue...",
+    seeAll: "Voir tout",
+    searchTitle: "Recherche",
+    searchPlaceholder: "Artistes, titres, albums...",
+    browseGenre: "Parcourir par genre",
+    resultsFor: "résultats pour",
+    noResult: "Aucun résultat trouvé",
+    tryAnother: "Essayez un autre terme",
+    myLibrary: "Ma Bibliothèque",
+    favorites: "Favoris",
+    playlists: "Playlists",
+    create: "Créer",
+    createPlaylist: "Créer une playlist",
+    newPlaylist: "Nouvelle playlist",
+    noFav: "Aucun favori pour l'instant",
+    pressHeart: "Appuyez sur ♥ pour ajouter des titres",
+    tracks: "titre(s)",
+    popularTracks: "Titres populaires",
+    profileTitle: "Profil",
+    emailUnset: "Email non renseigné",
+    settings: "Paramètres",
+    logout: "Se déconnecter",
+    logoutConfirm: "Êtes-vous sûr de vouloir quitter votre session LevelMusic ?",
+    cancel: "Annuler",
+    logoutBtn: "Déconnexion",
+    nowPlaying: "En lecture",
+    live: "● LIVE",
+    removeFromFav: "Retirer des favoris",
+    addToFav: "Ajouter aux favoris",
+    addToPls: "Ajouter à une playlist",
+    playNext: "Écouter ensuite",
+    viewArtist: "Voir l'artiste",
+    share: "Partager",
+    loginTitle: "Votre musique, partout.",
+    accessKeyLabel: "Clé d'accès Level",
+    accessKeyPlaceholder: "LVL-XXXXX-XXXXX",
+    accessBtn: "Accéder à LevelMusic",
+    accessing: "Vérification...",
+    ecoTitle: "Écosystème Level",
+    ecoSub: "Accès aux services",
+    homeNav: "Accueil",
+    searchNav: "Recherche",
+    libNav: "Bibliothèque",
+    profNav: "Profil",
+    banned: "Accès restreint (Banni)",
+    invalidKey: "Clé introuvable ou incorrecte",
+    errConn: "Erreur de connexion",
+    plsCreated: "Playlist créée !",
+    errPls: "Erreur création playlist",
+    linkCopied: "Lien copié !",
+    addedQueue: "Ajouté à la file d'attente",
+    plsFirst: "Créez d'abord une playlist !",
+    favAdded: "Ajouté aux favoris ❤️",
+    favRemoved: "Retiré des favoris",
+    language: "Langue",
+    switchLang: "Passer en English",
+    listenFull: "Écouter en entier",
+    sourcesTitle: "Écouter la version complète",
+    openIn: "Ouvrir dans"
+  },
+  en: {
+    greetingMor: "Good morning 👋",
+    greetingAft: "Good afternoon",
+    greetingEve: "Good evening 🌙",
+    whatToListen: "What are we listening to today?",
+    recent: "Recently played",
+    loadingCat: "Loading catalog...",
+    seeAll: "See all",
+    searchTitle: "Search",
+    searchPlaceholder: "Artists, tracks, albums...",
+    browseGenre: "Browse by genre",
+    resultsFor: "results for",
+    noResult: "No results found",
+    tryAnother: "Try another term",
+    myLibrary: "My Library",
+    favorites: "Favorites",
+    playlists: "Playlists",
+    create: "Create",
+    createPlaylist: "Create a playlist",
+    newPlaylist: "New playlist",
+    noFav: "No favorites yet",
+    pressHeart: "Press ♥ to add tracks",
+    tracks: "track(s)",
+    popularTracks: "Popular tracks",
+    profileTitle: "Profile",
+    emailUnset: "Email not provided",
+    settings: "Settings",
+    logout: "Log out",
+    logoutConfirm: "Are you sure you want to leave your LevelMusic session?",
+    cancel: "Cancel",
+    logoutBtn: "Log out",
+    nowPlaying: "Now playing",
+    live: "● LIVE",
+    removeFromFav: "Remove from favorites",
+    addToFav: "Add to favorites",
+    addToPls: "Add to playlist",
+    playNext: "Play next",
+    viewArtist: "View artist",
+    share: "Share",
+    loginTitle: "Your music, everywhere.",
+    accessKeyLabel: "Level Access Key",
+    accessKeyPlaceholder: "LVL-XXXXX-XXXXX",
+    accessBtn: "Access LevelMusic",
+    accessing: "Verifying...",
+    ecoTitle: "Level Ecosystem",
+    ecoSub: "Access to services",
+    homeNav: "Home",
+    searchNav: "Search",
+    libNav: "Library",
+    profNav: "Profile",
+    banned: "Access restricted (Banned)",
+    invalidKey: "Key not found or incorrect",
+    errConn: "Connection error",
+    plsCreated: "Playlist created!",
+    errPls: "Error creating playlist",
+    linkCopied: "Link copied!",
+    addedQueue: "Added to queue",
+    plsFirst: "Create a playlist first!",
+    favAdded: "Added to favorites ❤️",
+    favRemoved: "Removed from favorites",
+    language: "Language",
+    switchLang: "Switch to Français",
+    listenFull: "Listen fully",
+    sourcesTitle: "Listen to the full version",
+    openIn: "Open in"
+  }
+};
+
+// ─── LOGO ORIGINAL (Sans bulle carrée) ─────────────────────────────
 const CustomLogo = ({ className = "w-8 h-8" }) => (
-  <svg viewBox="0 0 24 24" className={className} fill="none">
+  <svg viewBox="0 0 24 24" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M9 18V5l12-2v13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     <circle cx="6" cy="18" r="3" fill="currentColor"/>
     <circle cx="18" cy="16" r="3" fill="currentColor"/>
@@ -285,77 +422,40 @@ const fetchMusic = async (term, limit = 20) => {
   } catch { return []; }
 };
 
-// ─── YOUTUBE VIDEO ID (via Invidious — videoEmbeddable uniquement) ─
-const INVIDIOUS = [
-  'https://inv.nadeko.net',
-  'https://invidious.privacyredirect.com',
-  'https://yt.artemislena.eu',
-  'https://invidious.lunar.icu',
-];
-
-const fetchYouTubeVideoId = async (trackName, artistName) => {
-  const queries = [
-    `${artistName} ${trackName} official audio`,
-    `${artistName} ${trackName} audio`,
-    `${artistName} ${trackName}`,
-  ];
-  for (const instance of INVIDIOUS) {
-    for (const q of queries) {
-      try {
-        const res = await fetch(
-          `${instance}/api/v1/search?q=${encodeURIComponent(q)}&type=video&fields=videoId,title,author,lengthSeconds&_=${Math.random()}`,
-          { signal: AbortSignal.timeout(4000) }
-        );
-        if (!res.ok) continue;
-        const data = await res.json();
-        if (!Array.isArray(data) || !data.length) continue;
-        // Prefer videos that look like official audio/music
-        const preferred = data.find(v =>
-          /official|audio|lyric|music/i.test(v.title) && v.videoId
-        );
-        const videoId = (preferred || data[0])?.videoId;
-        if (videoId) return videoId;
-      } catch {}
-    }
-    // If one instance worked at all, don't try others
-  }
-  return null;
-};
-
+// Intégration des traductions pour les catégories
 const CATEGORIES = [
-  { id: 1, title: "Nouveautés", term: "nouveautes 2024", color: "#1d4ed8" },
-  { id: 2, title: "Rap Français", term: "rap francais", color: "#7c3aed" },
-  { id: 3, title: "Hits Mondiaux", term: "top hits mondial", color: "#be185d" },
-  { id: 4, title: "Amapiano", term: "amapiano hits", color: "#b45309" },
-  { id: 5, title: "Rumba Congolaise", term: "rumba congolaise", color: "#065f46" },
-  { id: 6, title: "Afrobeat", term: "afrobeat", color: "#92400e" },
-  { id: 7, title: "Hip-Hop US", term: "us rap hip hop", color: "#1e3a5f" },
-  { id: 8, title: "Drill", term: "drill uk fr", color: "#111827" },
-  { id: 9, title: "Coupé-Décalé", term: "coupe decale", color: "#4c1d95" },
-  { id: 10, title: "Phonk", term: "phonk music", color: "#7f1d1d" },
-  { id: 11, title: "Lo-Fi", term: "lofi beats relax", color: "#1e3a5f" },
-  { id: 12, title: "R&B & Soul", term: "rnb soul hits", color: "#5b21b6" },
-  { id: 13, title: "Pop Mondiale", term: "pop hits 2024", color: "#be185d" },
-  { id: 14, title: "Reggaeton", term: "reggaeton latino", color: "#166534" },
-  { id: 15, title: "Dancehall", term: "dancehall reggae", color: "#92400e" },
-  { id: 16, title: "K-Pop", term: "kpop bts blackpink", color: "#831843" },
-  { id: 17, title: "Zouk Love", term: "zouk love", color: "#1e40af" },
-  { id: 18, title: "Classiques 2000", term: "hits 2000", color: "#374151" },
-  { id: 19, title: "Nostalgie 90s", term: "hits 90s", color: "#1f2937" },
-  { id: 20, title: "Rock Classics", term: "classic rock", color: "#111827" },
-  { id: 21, title: "Gospel", term: "gospel worship", color: "#78350f" },
-  { id: 22, title: "Électro & Club", term: "electro club dance", color: "#1d4ed8" },
-  { id: 23, title: "Jazz & Blues", term: "jazz blues", color: "#1e3a5f" },
-  { id: 24, title: "Deep House", term: "deep house chill", color: "#0f172a" },
-  { id: 25, title: "Trap US", term: "trap us atlanta", color: "#1c1917" },
-  { id: 26, title: "Indie Pop", term: "indie pop alternative", color: "#134e4a" },
-  { id: 27, title: "Acoustique", term: "acoustic guitar cover", color: "#3b1f0e" },
-  { id: 28, title: "Variété Française", term: "variete francaise", color: "#1e40af" },
-  { id: 29, title: "Ambient", term: "ambient relax sleep", color: "#0c1445" },
-  { id: 30, title: "Funk & Disco", term: "funk disco 70s", color: "#78350f" },
+  { id: 1, title: "Nouveautés", titleEn: "New Releases", term: "nouveautes 2024", color: "#1d4ed8" },
+  { id: 2, title: "Rap Français", titleEn: "French Rap", term: "rap francais", color: "#7c3aed" },
+  { id: 3, title: "Hits Mondiaux", titleEn: "Global Hits", term: "top hits mondial", color: "#be185d" },
+  { id: 4, title: "Amapiano", titleEn: "Amapiano", term: "amapiano hits", color: "#b45309" },
+  { id: 5, title: "Rumba Congolaise", titleEn: "Congolese Rumba", term: "rumba congolaise", color: "#065f46" },
+  { id: 6, title: "Afrobeat", titleEn: "Afrobeat", term: "afrobeat", color: "#92400e" },
+  { id: 7, title: "Hip-Hop US", titleEn: "US Hip-Hop", term: "us rap hip hop", color: "#1e3a5f" },
+  { id: 8, title: "Drill", titleEn: "Drill", term: "drill uk fr", color: "#111827" },
+  { id: 9, title: "Coupé-Décalé", titleEn: "Coupé-Décalé", term: "coupe decale", color: "#4c1d95" },
+  { id: 10, title: "Phonk", titleEn: "Phonk", term: "phonk music", color: "#7f1d1d" },
+  { id: 11, title: "Lo-Fi", titleEn: "Lo-Fi", term: "lofi beats relax", color: "#1e3a5f" },
+  { id: 12, title: "R&B & Soul", titleEn: "R&B & Soul", term: "rnb soul hits", color: "#5b21b6" },
+  { id: 13, title: "Pop Mondiale", titleEn: "Global Pop", term: "pop hits 2024", color: "#be185d" },
+  { id: 14, title: "Reggaeton", titleEn: "Reggaeton", term: "reggaeton latino", color: "#166534" },
+  { id: 15, title: "Dancehall", titleEn: "Dancehall", term: "dancehall reggae", color: "#92400e" },
+  { id: 16, title: "K-Pop", titleEn: "K-Pop", term: "kpop bts blackpink", color: "#831843" },
+  { id: 17, title: "Zouk Love", titleEn: "Zouk Love", term: "zouk love", color: "#1e40af" },
+  { id: 18, title: "Classiques 2000", titleEn: "2000s Classics", term: "hits 2000", color: "#374151" },
+  { id: 19, title: "Nostalgie 90s", titleEn: "90s Nostalgia", term: "hits 90s", color: "#1f2937" },
+  { id: 20, title: "Rock Classics", titleEn: "Rock Classics", term: "classic rock", color: "#111827" },
+  { id: 21, title: "Gospel", titleEn: "Gospel", term: "gospel worship", color: "#78350f" },
+  { id: 22, title: "Électro & Club", titleEn: "Electro & Club", term: "electro club dance", color: "#1d4ed8" },
+  { id: 23, title: "Jazz & Blues", titleEn: "Jazz & Blues", term: "jazz blues", color: "#1e3a5f" },
+  { id: 24, title: "Deep House", titleEn: "Deep House", term: "deep house chill", color: "#0f172a" },
+  { id: 25, title: "Trap US", titleEn: "US Trap", term: "trap us atlanta", color: "#1c1917" },
+  { id: 26, title: "Indie Pop", titleEn: "Indie Pop", term: "indie pop alternative", color: "#134e4a" },
+  { id: 27, title: "Acoustique", titleEn: "Acoustic", term: "acoustic guitar cover", color: "#3b1f0e" },
+  { id: 28, title: "Variété Française", titleEn: "French Variety", term: "variete francaise", color: "#1e40af" },
+  { id: 29, title: "Ambient", titleEn: "Ambient", term: "ambient relax sleep", color: "#0c1445" },
+  { id: 30, title: "Funk & Disco", titleEn: "Funk & Disco", term: "funk disco 70s", color: "#78350f" },
 ];
 
-// ─── TOAST SYSTEM ─────────────────────────────────────────────────
 function useToasts() {
   const [toasts, setToasts] = useState([]);
   const show = useCallback((msg, type = 'info') => {
@@ -366,13 +466,11 @@ function useToasts() {
   return { toasts, show };
 }
 
-// ─── COMPONENTS ───────────────────────────────────────────────────
-
 const Spinner = ({ size = 28 }) => (
-  <div style={{ width: size, height: size }} className="rounded-full border-2 border-white/10 border-t-blue-500 animate-spin" />
+  <div style={{ width: size, height: size }} className="rounded-full border-2 border-white/20 border-t-white animate-spin" />
 );
 
-const TrackRow = ({ track, idx, isPlaying, isCurrent, onPlay, onMore, showNum = true }) => (
+const TrackRow = ({ track, idx, isPlaying, isCurrent, onPlay, onMore }) => (
   <div className="track-row group" onClick={onPlay}>
     <div className="relative flex-shrink-0" style={{ width: 44, height: 44 }}>
       <img src={track.image} alt="" className="w-full h-full rounded-lg object-cover" loading="lazy" />
@@ -404,10 +502,7 @@ const AlbumCard = ({ track, size = 140, onPlay, onMore, isCurrent, isPlaying }) 
       <img src={track.image} alt="" className="w-full h-full object-cover" loading="lazy" />
       <div className={`absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity duration-200 ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}>
         <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-xl">
-          {isCurrent && isPlaying
-            ? <Pause size={18} fill="#0a0a0a" className="text-[#0a0a0a]" />
-            : <Play size={18} fill="#0a0a0a" className="text-[#0a0a0a] ml-0.5" />
-          }
+          {isCurrent && isPlaying ? <Pause size={18} fill="#0a0a0a" className="text-[#0a0a0a]" /> : <Play size={18} fill="#0a0a0a" className="text-[#0a0a0a] ml-0.5" />}
         </div>
       </div>
     </div>
@@ -416,8 +511,7 @@ const AlbumCard = ({ track, size = 140, onPlay, onMore, isCurrent, isPlaying }) 
   </div>
 );
 
-// ─── FULL SCREEN PLAYER ───────────────────────────────────────────
-const FullPlayer = ({ track, queue, queueIdx, isPlaying, progress, curTime, duration, volume, isLiked, shuffleOn, repeatMode, audioSource, ytVideoId, ytLoading, ytError, onClose, onToggle, onNext, onPrev, onSeek, onVolume, onLike, onShuffle, onRepeat, onMore, onSwitchSource, onArtist }) => {
+const FullPlayer = ({ track, queue, queueIdx, isPlaying, progress, curTime, duration, volume, isLiked, shuffleOn, repeatMode, onClose, onToggle, onNext, onPrev, onSeek, onVolume, onLike, onShuffle, onRepeat, onMore, onArtist, onOpenSources, t }) => {
   const progressRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [dragPct, setDragPct] = useState(0);
@@ -426,8 +520,7 @@ const FullPlayer = ({ track, queue, queueIdx, isPlaying, progress, curTime, dura
     if (!progressRef.current || duration <= 0) return;
     const rect = progressRef.current.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    return pct;
+    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
   }, [duration]);
 
   const displayPct = dragging ? dragPct * 100 : progress;
@@ -435,161 +528,102 @@ const FullPlayer = ({ track, queue, queueIdx, isPlaying, progress, curTime, dura
 
   return (
     <div className="fixed inset-0 z-[500] flex flex-col overflow-hidden slide-up" style={{ background: '#0a0a0a' }}>
-      {/* Dynamic color overlay from album */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(30,58,138,0.25) 0%, rgba(10,10,10,0) 50%)' }} />
-
-      {/* Header */}
       <div className="relative z-10 flex items-center justify-between px-5 pt-12 pb-4">
-        <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white">
-          <ChevronDown size={24} />
-        </button>
+        <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white"><ChevronDown size={24} /></button>
         <div className="text-center">
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--text2)]">En lecture</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--text2)]">{t('nowPlaying')}</p>
           <p className="text-xs font-semibold text-white mt-0.5 max-w-[200px] truncate">{track.album}</p>
         </div>
-        <button onClick={onMore} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white">
-          <MoreHorizontal size={20} />
-        </button>
+        <button onClick={onMore} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white"><MoreHorizontal size={20} /></button>
       </div>
 
-      {/* Source toggle */}
-      <div className="relative z-10 flex justify-center mb-4">
-        <div className="flex bg-white/8 rounded-full p-1 border border-white/10">
-          <button onClick={() => onSwitchSource('apple')} className={`px-5 py-1.5 rounded-full text-[11px] font-bold transition-all ${audioSource === 'apple' ? 'bg-blue-600 text-white shadow-md' : 'text-[var(--text2)]'}`}>
-            Aperçu HD
-          </button>
-          <button onClick={() => onSwitchSource('full')} className={`px-5 py-1.5 rounded-full text-[11px] font-bold transition-all ${audioSource === 'full' ? 'bg-red-600 text-white shadow-md' : 'text-[var(--text2)]'}`}>
-            Complet
-          </button>
-        </div>
-      </div>
-
-      {/* Album art / YouTube */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-8 min-h-0">
-        {audioSource === 'full' ? (
-          <div className="w-full max-w-xs rounded-3xl overflow-hidden shadow-2xl bg-black border border-white/8" style={{ aspectRatio: '16/9' }}>
-            {ytLoading && (
-              <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-[#111]">
-                <Spinner size={32} />
-                <p className="text-xs text-[var(--text2)] font-semibold">Recherche en cours...</p>
-              </div>
-            )}
-            {!ytLoading && ytError && (
-              <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-[#111] px-6 text-center">
-                <Music size={36} className="text-[var(--text3)]" />
-                <p className="text-sm text-[var(--text2)] font-semibold">Vidéo non disponible</p>
-                <p className="text-xs text-[var(--text3)]">Cette chanson n'a pas de vidéo embeddable</p>
-                <button onClick={() => onSwitchSource('apple')} className="mt-2 px-4 py-2 rounded-full bg-blue-600 text-white text-xs font-bold">
-                  Aperçu HD à la place
-                </button>
-              </div>
-            )}
-            {!ytLoading && ytVideoId && (
-              <iframe
-                key={ytVideoId}
-                className="w-full h-full"
-                src={`https://www.youtube.com/embed/${ytVideoId}?autoplay=1&rel=0&modestbranding=1`}
-                frameBorder="0"
-                allow="autoplay; encrypted-media; fullscreen"
-                allowFullScreen
-              />
-            )}
-          </div>
-        ) : (
-          <div className={`w-full max-w-xs aspect-square rounded-3xl overflow-hidden shadow-2xl ${isPlaying ? 'album-playing' : 'album-paused'}`}
-               style={{ boxShadow: '0 40px 80px -20px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.05)' }}>
-            <img src={track.imageLg || track.image} alt="" className="w-full h-full object-cover" />
-          </div>
-        )}
-
-        {/* Title + Like */}
+        <div className={`w-full max-w-xs aspect-square rounded-3xl overflow-hidden shadow-2xl ${isPlaying ? 'album-playing' : 'album-paused'}`} style={{ boxShadow: '0 40px 80px -20px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.05)' }}>
+          <img src={track.imageLg || track.image} alt="" className="w-full h-full object-cover" />
+        </div>
         <div className="w-full max-w-xs mt-8 flex items-start justify-between">
           <div className="flex-1 min-w-0 pr-4">
             <h2 className="text-2xl font-bold text-white leading-tight line-clamp-2">{track.name}</h2>
             <button onClick={onArtist} className="text-[var(--text2)] text-sm mt-1 font-medium hover:text-white transition-colors">{track.artist}</button>
           </div>
-          <button onClick={onLike} className="mt-1 p-1">
-            <Heart size={26} className={isLiked ? 'text-blue-500 fill-blue-500' : 'text-[var(--text2)]'} />
-          </button>
+          <button onClick={onLike} className="mt-1 p-1"><Heart size={26} className={isLiked ? 'text-blue-500 fill-blue-500' : 'text-[var(--text2)]'} /></button>
         </div>
       </div>
 
-      {/* Controls */}
       <div className="relative z-10 px-6 pb-safe" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 32px)' }}>
-        {/* Progress */}
-        {audioSource === 'apple' ? (
-          <div className="mb-5">
-            <div
-              ref={progressRef}
-              className={`progress-track ${dragging ? 'dragging' : ''}`}
-              style={{ height: 5 }}
-              onPointerDown={e => {
-                setDragging(true);
-                const pct = handleProgressPointer(e);
-                setDragPct(pct);
-                progressRef.current.setPointerCapture(e.pointerId);
-              }}
-              onPointerMove={e => {
-                if (!dragging) return;
-                setDragPct(handleProgressPointer(e));
-              }}
-              onPointerUp={e => {
-                if (!dragging) return;
-                const pct = handleProgressPointer(e);
-                onSeek(pct * duration);
-                setDragging(false);
-              }}
-            >
-              <div className="progress-fill" style={{ width: `${displayPct}%` }}>
-                <div className="progress-thumb" />
-              </div>
-            </div>
-            <div className="flex justify-between mt-2">
-              <span className="text-[11px] font-mono text-[var(--text3)]">{fmt(displayTime)}</span>
-              <span className="text-[11px] font-mono text-[var(--text3)]">{fmt(duration)}</span>
-            </div>
+        <div className="mb-5">
+          <div ref={progressRef} className={`progress-track ${dragging ? 'dragging' : ''}`} style={{ height: 5 }} onPointerDown={e => { setDragging(true); setDragPct(handleProgressPointer(e)); progressRef.current.setPointerCapture(e.pointerId); }} onPointerMove={e => { if (dragging) setDragPct(handleProgressPointer(e)); }} onPointerUp={e => { if (!dragging) return; onSeek(handleProgressPointer(e) * duration); setDragging(false); }}>
+            <div className="progress-fill" style={{ width: `${displayPct}%` }}><div className="progress-thumb" /></div>
           </div>
-        ) : (
-          <div className="mb-5 py-3 border-b border-white/8 flex items-center justify-between">
-            <span className="text-[11px] text-[var(--text3)]">{ytLoading ? 'Recherche...' : ytVideoId ? 'YouTube HD' : ytError ? 'Indisponible' : ''}</span>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text2)]">Lecture complète active</span>
-            {ytVideoId && <span className="text-[10px] text-blue-500 font-bold">● LIVE</span>}
-            {!ytVideoId && !ytLoading && <span className="w-16" />}
+          <div className="flex justify-between mt-2">
+            <span className="text-[11px] font-mono text-[var(--text3)]">{fmt(displayTime)}</span>
+            <span className="text-[11px] font-mono text-[var(--text3)]">{fmt(duration)}</span>
           </div>
-        )}
-
-        {/* Main controls */}
-        <div className="flex items-center justify-between mb-6">
-          <button onClick={onShuffle} className={`p-2 transition-all ${shuffleOn ? 'text-blue-500' : 'text-[var(--text2)]'}`}>
-            <Shuffle size={22} />
-          </button>
-          <button onClick={onPrev} className={`p-2 text-white transition-transform active:scale-90 ${audioSource === 'full' ? 'opacity-30 pointer-events-none' : ''}`}>
-            <SkipBack size={32} fill="white" />
-          </button>
-          <button onClick={onToggle} disabled={audioSource === 'full'} className={`w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-xl transition-transform active:scale-90 ${audioSource === 'full' ? 'opacity-30' : ''}`}>
-            {isPlaying ? <Pause size={28} fill="#0a0a0a" className="text-[#0a0a0a]" /> : <Play size={28} fill="#0a0a0a" className="text-[#0a0a0a] ml-1" />}
-          </button>
-          <button onClick={onNext} className={`p-2 text-white transition-transform active:scale-90 ${audioSource === 'full' ? 'opacity-30 pointer-events-none' : ''}`}>
-            <SkipForward size={32} fill="white" />
-          </button>
-          <button onClick={onRepeat} className={`p-2 transition-all ${repeatMode !== 'none' ? 'text-blue-500' : 'text-[var(--text2)]'}`}>
-            {repeatMode === 'one' ? <Repeat1 size={22} /> : <Repeat size={22} />}
-          </button>
         </div>
 
-        {/* Volume */}
-        <div className="flex items-center gap-3">
-          <VolumeX size={16} className="text-[var(--text3)] flex-shrink-0" />
-          <input type="range" min="0" max="1" step="0.01" value={volume} onChange={e => onVolume(parseFloat(e.target.value))} className="flex-1" />
-          <Volume2 size={16} className="text-[var(--text3)] flex-shrink-0" />
+        <div className="flex items-center justify-between mb-8">
+          <button onClick={onShuffle} className={`p-2 transition-all ${shuffleOn ? 'text-blue-500' : 'text-[var(--text2)]'}`}><Shuffle size={22} /></button>
+          <button onClick={onPrev} className={`p-2 text-white transition-transform active:scale-90`}><SkipBack size={32} fill="white" /></button>
+          <button onClick={onToggle} className={`w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-xl transition-transform active:scale-90`}>
+            {isPlaying ? <Pause size={28} fill="#0a0a0a" className="text-[#0a0a0a]" /> : <Play size={28} fill="#0a0a0a" className="text-[#0a0a0a] ml-1" />}
+          </button>
+          <button onClick={onNext} className={`p-2 text-white transition-transform active:scale-90`}><SkipForward size={32} fill="white" /></button>
+          <button onClick={onRepeat} className={`p-2 transition-all ${repeatMode !== 'none' ? 'text-blue-500' : 'text-[var(--text2)]'}`}>{repeatMode === 'one' ? <Repeat1 size={22} /> : <Repeat size={22} />}</button>
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 w-28">
+            <Volume2 size={16} className="text-[var(--text3)] flex-shrink-0" />
+            <input type="range" min="0" max="1" step="0.01" value={volume} onChange={e => onVolume(parseFloat(e.target.value))} className="flex-1 h-1 bg-white/20 rounded-full appearance-none outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full" />
+          </div>
+          
+          <button onClick={onOpenSources} className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 text-white text-xs font-bold hover:bg-white/20 transition-colors">
+            <ExternalLink size={14} /> {t('listenFull')}
+          </button>
         </div>
       </div>
     </div>
   );
 };
 
-// ─── OPTIONS SHEET ─────────────────────────────────────────────────
-const OptionsSheet = ({ track, isLiked, onClose, onLike, onQueue, onArtist, onShare, onPlaylistAdd }) => (
+const SourcesSheet = ({ track, onClose, t }) => {
+  const q = encodeURIComponent(`${track.artist} ${track.name}`);
+  const links = [
+    { name: 'Apple Music', url: track.trackViewUrl, color: 'bg-gradient-to-r from-pink-500 to-red-500' },
+    { name: 'YouTube', url: `https://www.youtube.com/results?search_query=${q}`, color: 'bg-red-600' },
+    { name: 'Spotify', url: `https://open.spotify.com/search/${q}`, color: 'bg-green-500' },
+    { name: 'Amazon Music', url: `https://music.amazon.com/search/${q}`, color: 'bg-blue-500' },
+    { name: 'Deezer', url: `https://www.deezer.com/search/${q}`, color: 'bg-purple-500' },
+  ];
+  
+  return (
+    <div className="fixed inset-0 z-[600] flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
+      <div className="w-full max-w-lg mx-auto rounded-t-3xl sheet-up overflow-hidden pb-8" style={{ background: '#1c1c1e' }} onClick={e => e.stopPropagation()}>
+        <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mt-3 mb-5" />
+        <div className="px-6 pb-4 border-b border-white/8">
+          <h3 className="text-lg font-bold text-white mb-1">{t('sourcesTitle')}</h3>
+          <p className="text-sm text-[var(--text2)]">{track.name} - {track.artist}</p>
+        </div>
+        <div className="py-2 px-4">
+          {links.map((link, i) => (
+            <a key={i} href={link.url} target="_blank" rel="noreferrer" onClick={onClose} className="w-full flex items-center gap-4 px-4 py-3 my-2 rounded-2xl hover:bg-white/5 transition-colors border border-white/5">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg ${link.color}`}>
+                {link.name.charAt(0)}
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-white font-semibold">{t('openIn')} {link.name}</p>
+              </div>
+              <ExternalLink size={16} className="text-[var(--text3)]" />
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const OptionsSheet = ({ track, isLiked, onClose, onLike, onQueue, onArtist, onShare, onPlaylistAdd, t }) => (
   <div className="fixed inset-0 z-[600] flex items-end" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
     <div className="w-full max-w-lg mx-auto rounded-t-3xl sheet-up overflow-hidden" style={{ background: '#1c1c1e' }} onClick={e => e.stopPropagation()}>
       <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mt-3 mb-5" />
@@ -602,11 +636,11 @@ const OptionsSheet = ({ track, isLiked, onClose, onLike, onQueue, onArtist, onSh
       </div>
       <div className="py-2 pb-8">
         {[
-          { icon: <Heart size={20} className={isLiked ? 'text-blue-500 fill-blue-500' : 'text-white'} />, label: isLiked ? 'Retirer des favoris' : 'Ajouter aux favoris', action: onLike },
-          { icon: <ListPlus size={20} className="text-white" />, label: 'Ajouter à une playlist', action: onPlaylistAdd },
-          { icon: <ListMusic size={20} className="text-white" />, label: 'Écouter ensuite', action: onQueue },
-          { icon: <Mic2 size={20} className="text-white" />, label: "Voir l'artiste", action: onArtist },
-          { icon: <Share2 size={20} className="text-blue-400" />, label: 'Partager', action: onShare },
+          { icon: <Heart size={20} className={isLiked ? 'text-blue-500 fill-blue-500' : 'text-white'} />, label: isLiked ? t('removeFromFav') : t('addToFav'), action: onLike },
+          { icon: <ListPlus size={20} className="text-white" />, label: t('addToPls'), action: onPlaylistAdd },
+          { icon: <ListMusic size={20} className="text-white" />, label: t('playNext'), action: onQueue },
+          { icon: <Mic2 size={20} className="text-white" />, label: t('viewArtist'), action: onArtist },
+          { icon: <Share2 size={20} className="text-blue-400" />, label: t('share'), action: onShare },
         ].map((item, i) => (
           <button key={i} onClick={() => { item.action(); onClose(); }} className="w-full flex items-center gap-5 px-6 py-4 hover:bg-white/5 transition-colors text-left">
             {item.icon}
@@ -618,8 +652,7 @@ const OptionsSheet = ({ track, isLiked, onClose, onLike, onQueue, onArtist, onSh
   </div>
 );
 
-// ─── MINI PLAYER ──────────────────────────────────────────────────
-const MiniPlayer = ({ track, isPlaying, progress, isLiked, onExpand, onToggle, onNext, onLike, onClose }) => (
+const MiniPlayer = ({ track, isPlaying, progress, isLiked, onExpand, onToggle, onNext, onLike }) => (
   <div className="mini-player" onClick={onExpand}>
     <div className="mini-progress"><div className="mini-progress-fill" style={{ width: `${progress}%` }} /></div>
     <img src={track.image} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
@@ -627,48 +660,38 @@ const MiniPlayer = ({ track, isPlaying, progress, isLiked, onExpand, onToggle, o
       <p className="text-sm font-semibold text-white truncate">{track.name}</p>
       <p className="text-[11px] text-[var(--text2)] truncate">{track.artist}</p>
     </div>
-    <button onClick={e => { e.stopPropagation(); onLike(e); }} className="p-2 flex-shrink-0">
-      <Heart size={20} className={isLiked ? 'text-blue-500 fill-blue-500' : 'text-[var(--text2)]'} />
-    </button>
-    <button onClick={e => { e.stopPropagation(); onToggle(e); }} className="p-2 flex-shrink-0 text-white">
-      {isPlaying ? <Pause size={24} fill="white" /> : <Play size={24} fill="white" className="ml-0.5" />}
-    </button>
-    <button onClick={e => { e.stopPropagation(); onNext(e); }} className="p-2 flex-shrink-0 text-white">
-      <SkipForward size={22} />
-    </button>
+    <button onClick={e => { e.stopPropagation(); onLike(e); }} className="p-2 flex-shrink-0"><Heart size={20} className={isLiked ? 'text-blue-500 fill-blue-500' : 'text-[var(--text2)]'} /></button>
+    <button onClick={e => { e.stopPropagation(); onToggle(e); }} className="p-2 flex-shrink-0 text-white">{isPlaying ? <Pause size={24} fill="white" /> : <Play size={24} fill="white" className="ml-0.5" />}</button>
+    <button onClick={e => { e.stopPropagation(); onNext(e); }} className="p-2 flex-shrink-0 text-white"><SkipForward size={22} /></button>
   </div>
 );
 
-// ─── PLAYLIST MODAL ────────────────────────────────────────────────
-const PlaylistModal = ({ onClose, onCreate }) => {
+const PlaylistModal = ({ onClose, onCreate, t }) => {
   const [name, setName] = useState('');
   return (
     <div className="fixed inset-0 z-[700] flex items-center justify-center p-6" style={{ background: 'rgba(0,0,0,0.85)' }}>
       <div className="w-full max-w-sm rounded-3xl p-8 fade-in" style={{ background: '#1c1c1e' }}>
-        <h3 className="text-xl font-bold text-white mb-6">Nouvelle playlist</h3>
-        <input
-          autoFocus
-          value={name}
-          onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && name.trim() && onCreate(name)}
-          className="w-full bg-black/60 border border-white/10 rounded-2xl px-4 py-4 text-white text-sm outline-none focus:border-blue-500 transition-colors placeholder:text-[var(--text3)] mb-6"
-          placeholder="Nom de la playlist..."
-        />
+        <h3 className="text-xl font-bold text-white mb-6">{t('newPlaylist')}</h3>
+        <input autoFocus value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && name.trim() && onCreate(name)} className="w-full bg-black/60 border border-white/10 rounded-2xl px-4 py-4 text-white text-sm outline-none focus:border-blue-500 transition-colors placeholder:text-[var(--text3)] mb-6" placeholder={t('newPlaylist') + "..."} />
         <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 py-3.5 rounded-2xl text-[var(--text2)] font-semibold text-sm bg-white/8 hover:bg-white/12 transition-colors">Annuler</button>
-          <button onClick={() => name.trim() && onCreate(name)} className="flex-1 py-3.5 rounded-2xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-500 transition-colors">Créer</button>
+          <button onClick={onClose} className="flex-1 py-3.5 rounded-2xl text-[var(--text2)] font-semibold text-sm bg-white/8 hover:bg-white/12 transition-colors">{t('cancel')}</button>
+          <button onClick={() => name.trim() && onCreate(name)} className="flex-1 py-3.5 rounded-2xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-500 transition-colors">{t('create')}</button>
         </div>
       </div>
     </div>
   );
 };
 
-// ─── MAIN APP ──────────────────────────────────────────────────────
 function App() {
+  const [lang, setLang] = useState(localStorage.getItem('lm_lang') || 'fr');
+  const t = useCallback((key) => i18n[lang][key] || key, [lang]);
+
   const [appState, setAppState] = useState('splash');
   const [accessKey, setAccessKey] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [verifiedUserId, setVerifiedUserId] = useState(null);
   const [userData, setUserData] = useState({ name: 'Utilisateur', photo: '', email: '' });
 
   // Audio state
@@ -682,16 +705,13 @@ function App() {
   const [duration, setDuration] = useState(30);
   const [volume, setVolume] = useState(0.85);
   const [shuffleOn, setShuffleOn] = useState(false);
-  const [repeatMode, setRepeatMode] = useState('none'); // none | all | one
-  const [audioSource, setAudioSource] = useState('apple');
-  const [ytVideoId, setYtVideoId] = useState(null);
-  const [ytLoading, setYtLoading] = useState(false);
-  const [ytError, setYtError] = useState(false);
+  const [repeatMode, setRepeatMode] = useState('none');
 
   // UI state
   const [view, setView] = useState('home');
   const [playerOpen, setPlayerOpen] = useState(false);
   const [optionsTrack, setOptionsTrack] = useState(null);
+  const [sourcesTrack, setSourcesTrack] = useState(null);
   const [playlistModal, setPlaylistModal] = useState(false);
   const [logoutConfirm, setLogoutConfirm] = useState(false);
   const { toasts, show: toast } = useToasts();
@@ -701,100 +721,99 @@ function App() {
   const [playlists, setPlaylists] = useState([]);
   const [recentlyPlayed, setRecentlyPlayed] = useState([]);
 
-  // Home
   const [homeRows, setHomeRows] = useState([]);
   const [loadedCats, setLoadedCats] = useState([]);
   const [catOffset, setCatOffset] = useState(0);
   const [homeLoading, setHomeLoading] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Search
   const [searchQ, setSearchQ] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
 
-  // Artist
   const [artistName, setArtistName] = useState('');
   const [artistTracks, setArtistTracks] = useState([]);
   const [artistLoading, setArtistLoading] = useState(false);
   const [prevView, setPrevView] = useState('home');
 
-  // ── Firebase Auth ───────────────────────────────────────────────
+  const toggleLang = () => {
+    const newLang = lang === 'fr' ? 'en' : 'fr';
+    setLang(newLang);
+    localStorage.setItem('lm_lang', newLang);
+  };
+
   useEffect(() => {
-    const init = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch(e) { console.error(e); }
-    };
+    const init = async () => { try { await signInAnonymously(auth); } catch(e) {} };
     init();
-    const unsub = onAuthStateChanged(auth, async u => {
-      if (u) {
-        setUser(u);
-        const savedName = localStorage.getItem('lm_name') || 'Utilisateur';
-        const savedPhoto = localStorage.getItem('lm_photo') || '';
-        const savedEmail = localStorage.getItem('lm_email') || '';
-        try {
-          const snap = await getDoc(doc(db, 'artifacts', appId, 'users', u.uid));
-          if (snap.exists()) {
-            const d = snap.data();
-            const n = d.name || d.displayName || savedName;
-            const p = d.photoURL || d.photo || savedPhoto;
-            const e = d.email || savedEmail;
-            setUserData({ name: n, photo: p, email: e });
-            if (n) localStorage.setItem('lm_name', n);
-            if (p) localStorage.setItem('lm_photo', p);
-            if (e) localStorage.setItem('lm_email', e);
-          } else {
-            setUserData({ name: savedName, photo: savedPhoto, email: savedEmail });
-          }
-        } catch { setUserData({ name: savedName, photo: savedPhoto, email: savedEmail }); }
-      }
-    });
+    const unsub = onAuthStateChanged(auth, u => { if (u) { setUser(u); setAuthReady(true); } });
     return () => unsub();
   }, []);
 
-  // ── Firestore listeners ─────────────────────────────────────────
   useEffect(() => {
-    if (!user || appState !== 'main') return;
-    const uid = user.uid;
-    const unsubLikes = onSnapshot(doc(db, 'artifacts', appId, 'users', uid, 'likes', 'data'), s => {
-      if (s.exists()) setLiked(s.data().tracks || []);
-    }, () => {});
-    const unsubPlay = onSnapshot(collection(db, 'artifacts', appId, 'users', uid, 'playlists'), s => {
-      const p = [];
-      s.forEach(d => p.push({ id: d.id, ...d.data() }));
-      if (p.length) setPlaylists(p);
-    }, () => {});
-    const savedLikes = localStorage.getItem('lm_likes');
-    if (savedLikes) setLiked(JSON.parse(savedLikes));
-    return () => { unsubLikes(); unsubPlay(); };
-  }, [user, appState]);
+    if (authReady && appState === 'splash') {
+      const savedKey = localStorage.getItem('lm_key');
+      if (savedKey) handleLogin(savedKey, true);
+      else setTimeout(() => setAppState('login'), 2200);
+    }
+  }, [authReady, appState]);
 
-  // ── Splash timer ────────────────────────────────────────────────
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setAppState(localStorage.getItem('lm_key') ? 'main' : 'login');
-    }, 2200);
-    return () => clearTimeout(t);
-  }, []);
-
-  // ── Login ───────────────────────────────────────────────────────
-  const handleLogin = () => {
-    if (!accessKey.trim()) return;
+  const handleLogin = async (keyToUse, isAuto = false) => {
+    const k = typeof keyToUse === 'string' ? keyToUse : accessKey;
+    if (!k.trim() || !auth.currentUser) return;
     setAuthLoading(true);
-    setTimeout(() => {
-      localStorage.setItem('lm_key', accessKey);
-      setAppState('main');
+
+    try {
+      const q = collectionGroup(db, 'security');
+      const querySnapshot = await getDocs(q);
+      let foundUserData = null;
+
+      querySnapshot.forEach(docSnap => {
+        if (docSnap.data().key === k.toUpperCase()) foundUserData = docSnap.data();
+      });
+
+      if (foundUserData) {
+        if (foundUserData.isDisabled) {
+          toast(t('banned'));
+          if (isAuto) { localStorage.removeItem('lm_key'); setAppState('login'); }
+          setAuthLoading(false);
+          return;
+        }
+        setVerifiedUserId(foundUserData.uid);
+        setUserData({ 
+          name: foundUserData.name || foundUserData.displayName || foundUserData.owner?.split('@')[0] || 'User', 
+          photo: foundUserData.photoURL || foundUserData.picture || '', 
+          email: foundUserData.owner || '' 
+        });
+        localStorage.setItem('lm_key', k.toUpperCase());
+        
+        if (isAuto) {
+          setAppState('main');
+        } else {
+          // Transition esthétique avant l'entrée dans l'app
+          setAppState('transition');
+          setTimeout(() => {
+            setAppState('main');
+            setAuthLoading(false);
+          }, 2000);
+        }
+      } else {
+        if (!isAuto) toast(t('invalidKey'));
+        localStorage.removeItem('lm_key');
+        if (isAuto) setAppState('login');
+        setAuthLoading(false);
+      }
+    } catch (err) {
+      if (!isAuto) toast(t('errConn'));
+      console.error(err);
+      if (isAuto) setAppState('login');
       setAuthLoading(false);
-    }, 900);
+    }
   };
 
   const handleLogout = () => {
     localStorage.removeItem('lm_key');
+    setVerifiedUserId(null);
+    setAccessKey(''); // <-- CORRECTION : Vider le champ de la clé de connexion
     audioRef.current.pause();
     setTrack(null);
     setIsPlaying(false);
@@ -802,20 +821,27 @@ function App() {
     setAppState('login');
   };
 
-  // ── Load home categories ────────────────────────────────────────
+  useEffect(() => {
+    if (!verifiedUserId || appState !== 'main') return;
+    const uid = verifiedUserId;
+    const unsubLikes = onSnapshot(doc(db, 'artifacts', appId, 'users', uid, 'likes', 'data'), s => { if (s.exists()) setLiked(s.data().tracks || []); }, () => {});
+    const unsubPlay = onSnapshot(collection(db, 'artifacts', appId, 'users', uid, 'playlists'), s => {
+      const p = []; s.forEach(d => p.push({ id: d.id, ...d.data() })); if (p.length) setPlaylists(p);
+    }, () => {});
+    const savedLikes = localStorage.getItem('lm_likes'); if (savedLikes) setLiked(JSON.parse(savedLikes));
+    return () => { unsubLikes(); unsubPlay(); };
+  }, [verifiedUserId, appState]);
+
   useEffect(() => {
     if (appState !== 'main') return;
-    setHomeRows([]);
-    setLoadedCats(shuffle(CATEGORIES));
-    setCatOffset(0);
+    setHomeRows([]); setLoadedCats(shuffle(CATEGORIES)); setCatOffset(0);
   }, [appState, reloadKey]);
 
   useEffect(() => {
     if (!loadedCats.length || homeLoading) return;
     const toLoad = loadedCats.slice(catOffset, catOffset + 5);
     if (!toLoad.length) return;
-    let mounted = true;
-    setHomeLoading(true);
+    let mounted = true; setHomeLoading(true);
     (async () => {
       const results = [];
       for (const cat of toLoad) {
@@ -825,245 +851,108 @@ function App() {
         await new Promise(r => setTimeout(r, 300));
       }
       if (mounted) {
-        setHomeRows(prev => {
-          const existing = new Set(prev.map(r => r.id));
-          return [...prev, ...results.filter(r => !existing.has(r.id))];
-        });
+        setHomeRows(prev => { const ex = new Set(prev.map(r => r.id)); return [...prev, ...results.filter(r => !ex.has(r.id))]; });
         setHomeLoading(false);
       }
     })();
     return () => { mounted = false; };
   }, [catOffset, loadedCats]);
 
-  const loadMoreHome = () => {
-    if (!homeLoading && catOffset + 5 < loadedCats.length) {
-      setCatOffset(prev => prev + 5);
-    }
-  };
+  const loadMoreHome = () => { if (!homeLoading && catOffset + 5 < loadedCats.length) setCatOffset(p => p + 5); };
+  const handleHomeScroll = e => { if (e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 500) loadMoreHome(); };
 
-  const handleHomeScroll = e => {
-    const el = e.currentTarget;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 500) loadMoreHome();
-  };
-
-  // ── Search ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!searchQ.trim()) { setSearchResults([]); return; }
-    const t = setTimeout(async () => {
-      setSearching(true);
-      const res = await fetchMusic(searchQ, 50);
-      setSearchResults(res);
-      setSearching(false);
-    }, 600);
+    const t = setTimeout(async () => { setSearching(true); const res = await fetchMusic(searchQ, 50); setSearchResults(res); setSearching(false); }, 600);
     return () => clearTimeout(t);
   }, [searchQ]);
 
-  // ── Audio engine ────────────────────────────────────────────────
-  const playTrack = useCallback((t, q = null, idx = 0) => {
-    setTrack(t);
-    const newQ = q || [t];
-    setQueue(newQ);
-    setQueueIdx(idx);
-    if (audioSource === 'apple' && t.previewUrl) {
-      audioRef.current.src = t.previewUrl;
-      audioRef.current.volume = volume;
-      audioRef.current.play().catch(() => {});
-    }
-    setIsPlaying(true);
-    setRecentlyPlayed(prev => {
-      const filtered = prev.filter(x => x.id !== t.id);
-      return [t, ...filtered].slice(0, 30);
-    });
-  }, [audioSource, volume]);
+  const playTrack = useCallback((t_track, q = null, idx = 0) => {
+    setTrack(t_track); setQueue(q || [t_track]); setQueueIdx(idx);
+    if (t_track.previewUrl) { audioRef.current.src = t_track.previewUrl; audioRef.current.volume = volume; audioRef.current.play().catch(() => {}); }
+    setIsPlaying(true); setRecentlyPlayed(prev => [t_track, ...prev.filter(x => x.id !== t_track.id)].slice(0, 30));
+  }, [volume]);
 
   const togglePlay = useCallback((e) => {
     if (e) e.stopPropagation();
-    if (audioSource === 'full') { setIsPlaying(p => !p); return; }
-    if (isPlaying) audioRef.current.pause();
-    else audioRef.current.play().catch(() => {});
+    if (isPlaying) audioRef.current.pause(); else audioRef.current.play().catch(() => {});
     setIsPlaying(p => !p);
-  }, [isPlaying, audioSource]);
+  }, [isPlaying]);
 
   const playNext = useCallback((e) => {
-    if (e) e.stopPropagation();
-    if (!queue.length) return;
-    let nextIdx;
-    if (shuffleOn) {
-      nextIdx = Math.floor(Math.random() * queue.length);
-    } else {
-      nextIdx = (queueIdx + 1) % queue.length;
-    }
+    if (e) e.stopPropagation(); if (!queue.length) return;
+    const nextIdx = shuffleOn ? Math.floor(Math.random() * queue.length) : (queueIdx + 1) % queue.length;
     playTrack(queue[nextIdx], queue, nextIdx);
   }, [queue, queueIdx, shuffleOn, playTrack]);
 
   const playPrev = useCallback(() => {
-    if (audioSource === 'apple' && audioRef.current.currentTime > 3) {
-      audioRef.current.currentTime = 0; return;
-    }
+    if (audioRef.current.currentTime > 3) { audioRef.current.currentTime = 0; return; }
     if (!queue.length) return;
-    const prevIdx = (queueIdx - 1 + queue.length) % queue.length;
-    playTrack(queue[prevIdx], queue, prevIdx);
-  }, [queue, queueIdx, audioSource, playTrack]);
+    const prevIdx = (queueIdx - 1 + queue.length) % queue.length; playTrack(queue[prevIdx], queue, prevIdx);
+  }, [queue, queueIdx, playTrack]);
 
-  const handleSeek = useCallback((time) => {
-    if (audioSource === 'full') return;
-    audioRef.current.currentTime = time;
-    setCurTime(time);
-    if (duration > 0) setProgress((time / duration) * 100);
-  }, [audioSource, duration]);
-
-  const switchSource = useCallback((src) => {
-    setAudioSource(src);
-    if (src === 'full') {
-      audioRef.current.pause();
-    } else if (track && isPlaying && track.previewUrl) {
-      audioRef.current.src = track.previewUrl;
-      audioRef.current.play().catch(() => {});
-    }
-  }, [track, isPlaying]);
-
-  // ── Fetch YouTube video ID when full mode is active ─────────────
-  useEffect(() => {
-    if (audioSource !== 'full' || !track) return;
-    let cancelled = false;
-    setYtVideoId(null);
-    setYtError(false);
-    setYtLoading(true);
-    fetchYouTubeVideoId(track.name, track.artist).then(id => {
-      if (cancelled) return;
-      setYtVideoId(id || null);
-      setYtError(!id);
-      setYtLoading(false);
-    });
-    return () => { cancelled = true; };
-  }, [audioSource, track?.id]);
+  const handleSeek = useCallback((time) => { audioRef.current.currentTime = time; setCurTime(time); if (duration > 0) setProgress((time / duration) * 100); }, [duration]);
 
   useEffect(() => {
     const audio = audioRef.current;
-    const onTime = () => {
-      setCurTime(audio.currentTime);
-      if (audio.duration) {
-        setDuration(audio.duration);
-        setProgress((audio.currentTime / audio.duration) * 100);
-      }
-    };
-    const onEnd = () => {
-      if (repeatMode === 'one') {
-        audio.currentTime = 0;
-        audio.play().catch(() => {});
-      } else {
-        setIsPlaying(false);
-        playNext();
-      }
-    };
-    audio.addEventListener('timeupdate', onTime);
-    audio.addEventListener('ended', onEnd);
+    const onTime = () => { setCurTime(audio.currentTime); if (audio.duration) { setDuration(audio.duration); setProgress((audio.currentTime / audio.duration) * 100); } };
+    const onEnd = () => { if (repeatMode === 'one') { audio.currentTime = 0; audio.play().catch(() => {}); } else { setIsPlaying(false); playNext(); } };
+    audio.addEventListener('timeupdate', onTime); audio.addEventListener('ended', onEnd);
     return () => { audio.removeEventListener('timeupdate', onTime); audio.removeEventListener('ended', onEnd); };
   }, [playNext, repeatMode]);
 
   useEffect(() => { audioRef.current.volume = volume; }, [volume]);
 
-  // ── Likes ───────────────────────────────────────────────────────
   const isLiked = useCallback((id) => liked.some(x => x.id === id), [liked]);
-  const toggleLike = useCallback(async (t, e) => {
+  const toggleLike = useCallback(async (t_track, e) => {
     if (e) e.stopPropagation();
-    const already = liked.some(x => x.id === t.id);
-    const newLiked = already ? liked.filter(x => x.id !== t.id) : [t, ...liked];
-    setLiked(newLiked);
-    localStorage.setItem('lm_likes', JSON.stringify(newLiked));
-    toast(already ? 'Retiré des favoris' : 'Ajouté aux favoris ❤️');
-    if (user) {
-      try { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'likes', 'data'), { tracks: newLiked }, { merge: true }); } catch {}
-    }
-  }, [liked, user, toast]);
+    const already = liked.some(x => x.id === t_track.id);
+    const newLiked = already ? liked.filter(x => x.id !== t_track.id) : [t_track, ...liked];
+    setLiked(newLiked); localStorage.setItem('lm_likes', JSON.stringify(newLiked));
+    toast(already ? t('favRemoved') : t('favAdded'));
+    if (verifiedUserId) { try { await setDoc(doc(db, 'artifacts', appId, 'users', verifiedUserId, 'likes', 'data'), { tracks: newLiked }, { merge: true }); } catch {} }
+  }, [liked, verifiedUserId, toast, t]);
 
-  // ── Playlists ───────────────────────────────────────────────────
   const createPlaylist = async (name) => {
-    if (!name.trim() || !user) return;
+    if (!name.trim() || !verifiedUserId) return;
     const newPl = { id: Date.now().toString(), name, createdAt: Date.now(), tracks: [] };
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'playlists', newPl.id), newPl);
-      toast('Playlist créée !');
-    } catch { toast('Erreur création playlist', 'error'); }
+    try { await setDoc(doc(db, 'artifacts', appId, 'users', verifiedUserId, 'playlists', newPl.id), newPl); toast(t('plsCreated')); } catch { toast(t('errPls'), 'error'); }
     setPlaylistModal(false);
   };
 
-  // ── Artist page ─────────────────────────────────────────────────
-  const openArtist = useCallback(async (t) => {
-    setPrevView(view);
-    setArtistName(t.artist || t.name);
-    setView('artist');
-    setArtistLoading(true);
-    setPlayerOpen(false);
-    setOptionsTrack(null);
-    const results = await fetchMusic(t.artist || t.name, 50);
-    setArtistTracks(results);
-    setArtistLoading(false);
-    window.scrollTo && window.scrollTo(0, 0);
+  const openArtist = useCallback(async (t_track) => {
+    setPrevView(view); setArtistName(t_track.artist || t_track.name); setView('artist'); setArtistLoading(true); setPlayerOpen(false); setOptionsTrack(null);
+    const results = await fetchMusic(t_track.artist || t_track.name, 50); setArtistTracks(results); setArtistLoading(false); window.scrollTo && window.scrollTo(0, 0);
   }, [view]);
 
-  // ── Share ───────────────────────────────────────────────────────
-  const shareTrack = (t) => {
-    const url = t.trackViewUrl || `https://music.apple.com/search?term=${encodeURIComponent(t.name)}`;
-    if (navigator.share) {
-      navigator.share({ title: t.name, text: `Écoute "${t.name}" sur LevelMusic !`, url }).catch(() => {});
-    } else {
-      navigator.clipboard?.writeText(url);
-      toast('Lien copié !');
-    }
+  const shareTrack = (t_track) => {
+    const url = t_track.trackViewUrl || `https://music.apple.com/search?term=${encodeURIComponent(t_track.name)}`;
+    if (navigator.share) { navigator.share({ title: t_track.name, text: `Écoute "${t_track.name}" sur LevelMusic !`, url }).catch(() => {}); }
+    else { navigator.clipboard?.writeText(url); toast(t('linkCopied')); }
   };
 
-  // ── Queue add ───────────────────────────────────────────────────
-  const addToQueue = (t) => {
-    setQueue(prev => {
-      const newQ = [...prev];
-      newQ.splice(queueIdx + 1, 0, t);
-      return newQ;
-    });
-    toast('Ajouté à la file d\'attente');
-  };
+  const addToQueue = (t_track) => { setQueue(prev => { const newQ = [...prev]; newQ.splice(queueIdx + 1, 0, t_track); return newQ; }); toast(t('addedQueue')); };
 
-  // ── Long press ─────────────────────────────────────────────────
-  const lpTimer = useRef(null);
-  let lpFired = false;
-  const onPtrDown = (t) => {
-    lpFired = false;
-    lpTimer.current = setTimeout(() => { lpFired = true; setOptionsTrack(t); }, 450);
-  };
-  const onPtrUp = (t, cb) => {
-    clearTimeout(lpTimer.current);
-    if (!lpFired) cb();
-  };
+  const lpTimer = useRef(null); let lpFired = false;
+  const onPtrDown = (t_track) => { lpFired = false; lpTimer.current = setTimeout(() => { lpFired = true; setOptionsTrack(t_track); }, 450); };
+  const onPtrUp = (t_track, cb) => { clearTimeout(lpTimer.current); if (!lpFired) cb(); };
   const onPtrMove = () => clearTimeout(lpTimer.current);
 
-  // ── Avatar ─────────────────────────────────────────────────────
   const Avatar = ({ size = 32, textSize = 14 }) => {
     const init = (userData.name || 'U').charAt(0).toUpperCase();
     if (userData.photo) return <img src={userData.photo} alt="" style={{ width: size, height: size }} className="rounded-full object-cover border border-white/10" />;
-    return (
-      <div className="rounded-full bg-blue-600 flex items-center justify-center border border-blue-500/40" style={{ width: size, height: size, fontSize: textSize, fontWeight: 700, color: 'white' }}>
-        {init}
-      </div>
-    );
+    return <div className="rounded-full bg-blue-600 flex items-center justify-center border border-blue-500/40" style={{ width: size, height: size, fontSize: textSize, fontWeight: 700, color: 'white' }}>{init}</div>;
   };
 
-  // ──────────────────────────────────────────────────────────────
-  // RENDER: SPLASH
+  const getGreeting = () => { const h = new Date().getHours(); if (h < 12) return t('greetingMor'); if (h < 18) return t('greetingAft'); return t('greetingEve'); };
+
   // ──────────────────────────────────────────────────────────────
   if (appState === 'splash') {
     return (
       <div className="fixed inset-0 flex items-center justify-center" style={{ background: '#0a0a0a' }}>
         <div className="splash-anim flex flex-col items-center gap-6">
           <div className="relative w-20 h-20 flex items-center justify-center">
-            <svg className="absolute inset-0 spin-ring" viewBox="0 0 100 100" fill="none">
-              <circle cx="50" cy="50" r="46" stroke="url(#g1)" strokeWidth="1.5" strokeDasharray="72 28" strokeLinecap="round" />
-              <defs>
-                <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#60a5fa" />
-                  <stop offset="100%" stopColor="#1d4ed8" />
-                </linearGradient>
-              </defs>
-            </svg>
+            <svg className="absolute inset-0 spin-ring" viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="46" stroke="url(#g1)" strokeWidth="1.5" strokeDasharray="72 28" strokeLinecap="round" /><defs><linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#60a5fa" /><stop offset="100%" stopColor="#1d4ed8" /></linearGradient></defs></svg>
             <CustomLogo className="w-9 h-9 text-blue-500" />
           </div>
           <WordMark size="text-3xl" />
@@ -1073,48 +962,64 @@ function App() {
   }
 
   // ──────────────────────────────────────────────────────────────
-  // RENDER: LOGIN
-  // ──────────────────────────────────────────────────────────────
   if (appState === 'login') {
     return (
-      <div className="fixed inset-0 flex items-center justify-center px-5 scroll-y" style={{ background: '#0a0a0a' }}>
-        <div className="w-full max-w-sm fade-in">
-          <div className="flex flex-col items-center mb-10">
-            <div className="relative w-16 h-16 flex items-center justify-center mb-5">
-              <div className="absolute inset-0 rounded-full bg-blue-600/20 border border-blue-500/30" />
-              <CustomLogo className="w-8 h-8 text-blue-500" />
-            </div>
-            <WordMark size="text-3xl" />
-            <p className="text-[var(--text2)] text-sm mt-2 text-center">Votre musique, partout.</p>
+      <div className="fixed inset-0 flex items-center justify-center px-6 bg-[#0a0a0a] relative overflow-hidden">
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[140%] h-[400px] bg-blue-600/5 blur-[120px] pointer-events-none" />
+
+        <div className="w-full max-w-sm fade-in relative z-10 flex flex-col items-center">
+          <div className="mb-10 flex flex-col items-center">
+            {/* Logo musical épuré comme demandé */}
+            <CustomLogo className="w-16 h-16 text-blue-500 mb-6 drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]" />
+            <WordMark size="text-4xl" />
+            <p className="text-[var(--text2)] text-sm mt-3 font-medium opacity-60">{t('loginTitle')}</p>
           </div>
 
-          <div className="rounded-3xl p-8 border border-white/8" style={{ background: '#111' }}>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--text3)] mb-2">Clé d'accès</p>
+          <div className="w-full rounded-2xl p-7 border border-white/10 bg-[#111]/80 backdrop-blur-xl shadow-2xl">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--text3)] mb-4">{t('accessKeyLabel')}</p>
             <input
               type="text"
               value={accessKey}
               onChange={e => setAccessKey(e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g, '').substring(0, 16))}
               onKeyDown={e => e.key === 'Enter' && handleLogin()}
-              className="w-full bg-black/60 border border-white/10 rounded-2xl px-4 py-4 text-center text-white font-mono tracking-widest text-base outline-none focus:border-blue-500 transition-colors placeholder:text-[var(--text3)] mb-5"
-              placeholder="LVL-XXXXX-XXXXX"
+              className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-4 text-center text-white font-mono tracking-widest outline-none focus:border-blue-500 transition-all mb-6"
+              placeholder={t('accessKeyPlaceholder')}
             />
             <button
-              onClick={handleLogin}
+              onClick={() => handleLogin()}
               disabled={authLoading}
-              className="w-full py-4 rounded-full bg-blue-600 text-white font-bold text-sm hover:bg-blue-500 transition-colors disabled:opacity-50"
-              style={{ boxShadow: '0 0 24px rgba(59,130,246,0.35)' }}
+              className={`w-full py-4 rounded-xl font-bold text-sm transition-all duration-300 flex justify-center items-center gap-3 transform ${
+                authLoading ? 'bg-blue-700 text-white scale-[0.98] opacity-90' :
+                'bg-blue-600 text-white hover:bg-blue-500 active:scale-[0.96] shadow-[0_8px_24px_rgba(59,130,246,0.25)]'
+              }`}
             >
-              {authLoading ? 'Connexion...' : 'Accéder à LevelMusic'}
+              {authLoading ? <Spinner size={18} /> : null}
+              {authLoading ? t('accessing') : t('accessBtn')}
             </button>
           </div>
 
-          <div className="mt-6 flex justify-center">
-            <a href="https://ecosystem-of-levelup.vercel.app/" target="_blank" rel="noreferrer"
-               className="flex items-center gap-2 text-xs font-semibold text-[var(--text2)] hover:text-white transition-colors border border-white/10 px-5 py-3 rounded-full hover:border-blue-500/50">
-              <Network size={14} className="text-blue-500" />
-              Rejoindre l'Écosystème Level
+          <div className="mt-12 w-full">
+            <a href="https://ecosystem-of-levelup.vercel.app/" target="_blank" rel="noreferrer" className="group flex items-center justify-between gap-4 px-5 py-4 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition-all duration-300">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center border border-blue-500/20 group-hover:scale-110 transition-transform"><Network size={18} className="text-blue-500" /></div>
+                <div className="text-left"><p className="text-white text-sm font-bold">{t('ecoTitle')}</p><p className="text-[var(--text3)] text-[10px] uppercase font-bold tracking-wider">{t('ecoSub')}</p></div>
+              </div>
+              <ChevronRight size={18} className="text-[var(--text3)] group-hover:text-white group-hover:translate-x-1 transition-all" />
             </a>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // RENDER: TRANSITION ECRAN
+  // ──────────────────────────────────────────────────────────────
+  if (appState === 'transition') {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-[#0a0a0a] z-[200] fade-in">
+        <div className="flex flex-col items-center gap-6 animate-pulse">
+          <CustomLogo className="w-24 h-24 text-blue-500 drop-shadow-[0_0_25px_rgba(59,130,246,0.6)]" />
         </div>
       </div>
     );
@@ -1128,26 +1033,23 @@ function App() {
   return (
     <div className="fixed inset-0 flex flex-col" style={{ background: 'var(--bg)' }}>
 
-      {/* ── Toasts ── */}
       <div className="fixed top-16 right-4 z-[1000] flex flex-col gap-2 pointer-events-none">
-        {toasts.map(t => (
-          <div key={t.id} className="toast-anim glass-dark border border-white/10 text-white px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold max-w-xs">
-            {t.msg}
-          </div>
+        {toasts.map(t_toast => (
+          <div key={t_toast.id} className="toast-anim glass-dark border border-white/10 text-white px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold max-w-xs">{t_toast.msg}</div>
         ))}
       </div>
 
-      {/* ── Modals ── */}
-      {playlistModal && <PlaylistModal onClose={() => setPlaylistModal(false)} onCreate={createPlaylist} />}
+      {playlistModal && <PlaylistModal onClose={() => setPlaylistModal(false)} onCreate={createPlaylist} t={t} />}
+      {sourcesTrack && <SourcesSheet track={sourcesTrack} onClose={() => setSourcesTrack(null)} t={t} />}
 
       {logoutConfirm && (
         <div className="fixed inset-0 z-[700] flex items-center justify-center p-6" style={{ background: 'rgba(0,0,0,0.85)' }}>
           <div className="w-full max-w-sm rounded-3xl p-8 fade-in" style={{ background: '#1c1c1e' }}>
-            <h3 className="text-xl font-bold text-white mb-2">Déconnexion</h3>
-            <p className="text-[var(--text2)] text-sm mb-8">Êtes-vous sûr de vouloir quitter votre session LevelMusic ?</p>
+            <h3 className="text-xl font-bold text-white mb-2">{t('logoutTitle')}</h3>
+            <p className="text-[var(--text2)] text-sm mb-8">{t('logoutConfirm')}</p>
             <div className="flex gap-3">
-              <button onClick={() => setLogoutConfirm(false)} className="flex-1 py-3.5 rounded-2xl bg-white/8 text-white font-semibold text-sm hover:bg-white/12 transition-colors">Annuler</button>
-              <button onClick={handleLogout} className="flex-1 py-3.5 rounded-2xl bg-red-600 text-white font-bold text-sm hover:bg-red-500 transition-colors">Déconnexion</button>
+              <button onClick={() => setLogoutConfirm(false)} className="flex-1 py-3.5 rounded-2xl bg-white/8 text-white font-semibold text-sm hover:bg-white/12 transition-colors">{t('cancel')}</button>
+              <button onClick={handleLogout} className="flex-1 py-3.5 rounded-2xl bg-red-600 text-white font-bold text-sm hover:bg-red-500 transition-colors">{t('logoutBtn')}</button>
             </div>
           </div>
         </div>
@@ -1155,82 +1057,49 @@ function App() {
 
       {optionsTrack && (
         <OptionsSheet
-          track={optionsTrack}
-          isLiked={isLiked(optionsTrack.id)}
-          onClose={() => setOptionsTrack(null)}
-          onLike={() => toggleLike(optionsTrack)}
-          onQueue={() => { addToQueue(optionsTrack); toast("Ajouté à la file"); }}
-          onArtist={() => openArtist(optionsTrack)}
-          onShare={() => shareTrack(optionsTrack)}
-          onPlaylistAdd={() => { setPlaylistModal(true); toast("Crée d'abord une playlist !"); }}
+          track={optionsTrack} isLiked={isLiked(optionsTrack.id)} onClose={() => setOptionsTrack(null)}
+          onLike={() => toggleLike(optionsTrack)} onQueue={() => { addToQueue(optionsTrack); }}
+          onArtist={() => openArtist(optionsTrack)} onShare={() => shareTrack(optionsTrack)}
+          onPlaylistAdd={() => { setPlaylistModal(true); toast(t('plsFirst')); }} t={t}
         />
       )}
 
-      {/* ── Full Screen Player ── */}
       {playerOpen && track && (
         <FullPlayer
-          track={track} queue={queue} queueIdx={queueIdx}
-          isPlaying={isPlaying} progress={progress} curTime={curTime} duration={duration}
-          volume={volume} isLiked={isLiked(track.id)}
-          shuffleOn={shuffleOn} repeatMode={repeatMode} audioSource={audioSource}
-          ytVideoId={ytVideoId} ytLoading={ytLoading} ytError={ytError}
-          onClose={() => setPlayerOpen(false)}
-          onToggle={togglePlay} onNext={playNext} onPrev={playPrev}
-          onSeek={handleSeek} onVolume={setVolume}
-          onLike={() => toggleLike(track)}
-          onShuffle={() => setShuffleOn(p => !p)}
-          onRepeat={() => setRepeatMode(m => m === 'none' ? 'all' : m === 'all' ? 'one' : 'none')}
-          onMore={() => { setOptionsTrack(track); }}
-          onSwitchSource={switchSource}
-          onArtist={() => openArtist(track)}
+          track={track} queue={queue} queueIdx={queueIdx} isPlaying={isPlaying} progress={progress} curTime={curTime} duration={duration} volume={volume} isLiked={isLiked(track.id)} shuffleOn={shuffleOn} repeatMode={repeatMode}
+          onClose={() => setPlayerOpen(false)} onToggle={togglePlay} onNext={playNext} onPrev={playPrev} onSeek={handleSeek} onVolume={setVolume} onLike={() => toggleLike(track)} onShuffle={() => setShuffleOn(p => !p)} onRepeat={() => setRepeatMode(m => m === 'none' ? 'all' : m === 'all' ? 'one' : 'none')} onMore={() => { setOptionsTrack(track); }} onArtist={() => openArtist(track)} onOpenSources={() => setSourcesTrack(track)} t={t}
         />
       )}
 
-      {/* ── HEADER ── */}
-      <header className="flex-shrink-0 flex items-center justify-between px-5 pt-12 pb-4 z-[100]"
-              style={{ background: 'linear-gradient(180deg, rgba(10,10,10,1) 0%, rgba(10,10,10,0) 100%)' }}>
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setView('home'); }}>
+      <header className="flex-shrink-0 flex items-center justify-between px-5 pt-12 pb-4 z-[100]" style={{ background: 'linear-gradient(180deg, rgba(10,10,10,1) 0%, rgba(10,10,10,0) 100%)' }}>
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setReloadKey(k => k + 1); setView('home'); window.scrollTo({top: 0, behavior: 'smooth'}); }}>
           <CustomLogo className="w-7 h-7 text-blue-500" />
           <WordMark size="text-lg" />
         </div>
-        <button onClick={() => setView('profile')} className="rounded-full overflow-hidden">
-          <Avatar size={34} textSize={14} />
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setView('profile')} className="rounded-full overflow-hidden"><Avatar size={34} textSize={14} /></button>
+        </div>
       </header>
 
-      {/* ── MAIN CONTENT ── */}
       <main className="flex-1 overflow-hidden relative">
 
-        {/* ══ HOME ══ */}
         {view === 'home' && (
           <div className="h-full scroll-y fade-in" onScroll={handleHomeScroll} style={{ paddingBottom: bottomPad }}>
             <div className="px-5 pb-4">
-              <h1 className="text-3xl font-black text-white mb-1">
-                {(() => {
-                  const h = new Date().getHours();
-                  if (h < 12) return 'Bonjour 👋';
-                  if (h < 18) return 'Bon après-midi';
-                  return 'Bonsoir 🌙';
-                })()}
-              </h1>
-              <p className="text-[var(--text2)] text-sm">Qu'est-ce qu'on écoute aujourd'hui ?</p>
+              <h1 className="text-3xl font-black text-white mb-1">{getGreeting()}</h1>
+              <p className="text-[var(--text2)] text-sm">{t('whatToListen')}</p>
             </div>
 
-            {/* Recently played */}
             {recentlyPlayed.length > 0 && (
               <div className="mb-8">
-                <div className="flex items-center justify-between px-5 mb-4">
-                  <h2 className="text-lg font-bold text-white">Écoutés récemment</h2>
-                </div>
+                <div className="flex items-center justify-between px-5 mb-4"><h2 className="text-lg font-bold text-white">{t('recent')}</h2></div>
                 <div className="grid grid-cols-2 gap-3 px-5">
-                  {recentlyPlayed.slice(0, 6).map((t, idx) => (
-                    <div key={t.id + idx} onClick={() => playTrack(t, recentlyPlayed, idx)}
-                         className="flex items-center gap-3 rounded-xl cursor-pointer card-hover group"
-                         style={{ background: '#1c1c1e' }}>
-                      <img src={t.image} alt="" className="w-14 h-14 rounded-l-xl object-cover flex-shrink-0" />
+                  {recentlyPlayed.slice(0, 6).map((t_track, idx) => (
+                    <div key={t_track.id + idx} onClick={() => playTrack(t_track, recentlyPlayed, idx)} className="flex items-center gap-3 rounded-xl cursor-pointer card-hover group" style={{ background: '#1c1c1e' }}>
+                      <img src={t_track.image} alt="" className="w-14 h-14 rounded-l-xl object-cover flex-shrink-0" />
                       <div className="flex-1 min-w-0 py-2 pr-2">
-                        <p className={`text-xs font-bold truncate ${track?.id === t.id ? 'text-blue-400' : 'text-white'}`}>{t.name}</p>
-                        <p className="text-[10px] text-[var(--text2)] truncate mt-0.5">{t.artist}</p>
+                        <p className={`text-xs font-bold truncate ${track?.id === t_track.id ? 'text-blue-400' : 'text-white'}`}>{t_track.name}</p>
+                        <p className="text-[10px] text-[var(--text2)] truncate mt-0.5">{t_track.artist}</p>
                       </div>
                     </div>
                   ))}
@@ -1238,68 +1107,46 @@ function App() {
               </div>
             )}
 
-            {/* Category rows */}
             {homeRows.length === 0 && !homeLoading && (
-              <div className="flex flex-col items-center justify-center py-24 gap-4">
-                <Spinner size={36} />
-                <p className="text-[var(--text3)] text-xs font-semibold uppercase tracking-widest">Chargement du catalogue...</p>
-              </div>
+              <div className="flex flex-col items-center justify-center py-24 gap-4"><Spinner size={36} /><p className="text-[var(--text3)] text-xs font-semibold uppercase tracking-widest">{t('loadingCat')}</p></div>
             )}
 
             {homeRows.map(row => (
               <div key={row.id} className="mb-8">
                 <div className="flex items-center justify-between px-5 mb-4">
-                  <h2 className="text-lg font-bold text-white">{row.title}</h2>
-                  <button onClick={() => { setSearchQ(row.term); setView('search'); }} className="text-xs font-semibold text-blue-500">Voir tout</button>
+                  <h2 className="text-lg font-bold text-white">{lang === 'en' ? row.titleEn : row.title}</h2>
+                  <button onClick={() => { setSearchQ(row.term); setView('search'); }} className="text-xs font-semibold text-blue-500">{t('seeAll')}</button>
                 </div>
                 <div className="scroll-x gap-4 px-5">
-                  {row.data.map((t, idx) => (
-                    <div key={t.id} onPointerDown={() => onPtrDown(t)} onPointerUp={() => onPtrUp(t, () => playTrack(t, row.data, idx))} onPointerMove={onPtrMove} onPointerCancel={onPtrMove} onContextMenu={e => e.preventDefault()}>
-                      <AlbumCard track={t} size={148} isCurrent={track?.id === t.id} isPlaying={isPlaying && track?.id === t.id} onPlay={() => {}} onMore={() => setOptionsTrack(t)} />
+                  {row.data.map((t_track, idx) => (
+                    <div key={t_track.id} onPointerDown={() => onPtrDown(t_track)} onPointerUp={() => onPtrUp(t_track, () => playTrack(t_track, row.data, idx))} onPointerMove={onPtrMove} onPointerCancel={onPtrMove} onContextMenu={e => e.preventDefault()}>
+                      <AlbumCard track={t_track} size={148} isCurrent={track?.id === t_track.id} isPlaying={isPlaying && track?.id === t_track.id} onPlay={() => {}} onMore={() => setOptionsTrack(t_track)} />
                     </div>
                   ))}
                 </div>
               </div>
             ))}
-
-            {homeLoading && (
-              <div className="flex justify-center py-8"><Spinner /></div>
-            )}
+            {homeLoading && <div className="flex justify-center py-8"><Spinner /></div>}
           </div>
         )}
 
-        {/* ══ SEARCH ══ */}
         {view === 'search' && (
           <div className="h-full flex flex-col fade-in">
             <div className="px-5 pb-4 flex-shrink-0">
-              <h1 className="text-3xl font-black text-white mb-4">Recherche</h1>
+              <h1 className="text-3xl font-black text-white mb-4">{t('searchTitle')}</h1>
               <div className="relative">
                 <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text3)]" />
-                <input
-                  autoFocus
-                  value={searchQ}
-                  onChange={e => setSearchQ(e.target.value)}
-                  className="w-full rounded-xl pl-10 pr-4 py-3.5 text-sm text-white outline-none transition-colors border border-white/8 focus:border-blue-500/50"
-                  style={{ background: '#1c1c1e' }}
-                  placeholder="Artistes, titres, albums..."
-                />
-                {searchQ && (
-                  <button onClick={() => setSearchQ('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text3)] hover:text-white transition-colors">
-                    <X size={16} />
-                  </button>
-                )}
+                <input autoFocus value={searchQ} onChange={e => setSearchQ(e.target.value)} className="w-full rounded-xl pl-10 pr-4 py-3.5 text-sm text-white outline-none transition-colors border border-white/8 focus:border-blue-500/50" style={{ background: '#1c1c1e' }} placeholder={t('searchPlaceholder')} />
+                {searchQ && <button onClick={() => setSearchQ('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text3)] hover:text-white transition-colors"><X size={16} /></button>}
               </div>
             </div>
 
             {!searchQ && (
               <div className="flex-1 scroll-y px-5 pb-8" style={{ paddingBottom: bottomPad }}>
-                <p className="text-sm font-bold text-[var(--text2)] mb-4 uppercase tracking-wider">Parcourir par genre</p>
+                <p className="text-sm font-bold text-[var(--text2)] mb-4 uppercase tracking-wider">{t('browseGenre')}</p>
                 <div className="grid grid-cols-2 gap-3">
                   {CATEGORIES.map(cat => (
-                    <button key={cat.id} onClick={() => setSearchQ(cat.term)} className="relative rounded-2xl overflow-hidden flex items-center justify-center font-bold text-white text-sm py-6 text-center transition-transform active:scale-95"
-                            style={{ background: cat.color, minHeight: 80 }}>
-                      {cat.title}
-                    </button>
+                    <button key={cat.id} onClick={() => setSearchQ(cat.term)} className="relative rounded-2xl overflow-hidden flex items-center justify-center font-bold text-white text-sm py-6 text-center transition-transform active:scale-95" style={{ background: cat.color, minHeight: 80 }}>{lang === 'en' ? cat.titleEn : cat.title}</button>
                   ))}
                 </div>
               </div>
@@ -1311,237 +1158,128 @@ function App() {
                   <div className="flex justify-center py-16"><Spinner size={36} /></div>
                 ) : searchResults.length > 0 ? (
                   <div className="py-2">
-                    <p className="text-xs text-[var(--text3)] font-semibold px-5 mb-3">{searchResults.length} résultats pour « {searchQ} »</p>
-                    {searchResults.map((t, idx) => (
-                      <div key={t.id} onPointerDown={() => onPtrDown(t)} onPointerUp={() => onPtrUp(t, () => playTrack(t, searchResults, idx))} onPointerMove={onPtrMove} onPointerCancel={onPtrMove} onContextMenu={e => e.preventDefault()}>
-                        <TrackRow track={t} idx={idx} isPlaying={isPlaying} isCurrent={track?.id === t.id} onPlay={() => {}} onMore={() => setOptionsTrack(t)} />
+                    <p className="text-xs text-[var(--text3)] font-semibold px-5 mb-3">{searchResults.length} {t('resultsFor')} « {searchQ} »</p>
+                    {searchResults.map((t_track, idx) => (
+                      <div key={t_track.id} onPointerDown={() => onPtrDown(t_track)} onPointerUp={() => onPtrUp(t_track, () => playTrack(t_track, searchResults, idx))} onPointerMove={onPtrMove} onPointerCancel={onPtrMove} onContextMenu={e => e.preventDefault()}>
+                        <TrackRow track={t_track} idx={idx} isPlaying={isPlaying} isCurrent={track?.id === t_track.id} onPlay={() => {}} onMore={() => setOptionsTrack(t_track)} />
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center py-24 gap-3">
-                    <Music size={48} className="text-[var(--text3)]" />
-                    <p className="text-[var(--text2)] font-semibold">Aucun résultat trouvé</p>
-                    <p className="text-[var(--text3)] text-sm">Essayez un autre terme</p>
-                  </div>
+                  <div className="flex flex-col items-center py-24 gap-3"><Music size={48} className="text-[var(--text3)]" /><p className="text-[var(--text2)] font-semibold">{t('noResult')}</p><p className="text-[var(--text3)] text-sm">{t('tryAnother')}</p></div>
                 )}
               </div>
             )}
           </div>
         )}
 
-        {/* ══ LIBRARY ══ */}
         {view === 'library' && (
           <div className="h-full scroll-y fade-in px-5" style={{ paddingBottom: bottomPad }}>
-            <h1 className="text-3xl font-black text-white mb-6">Ma Bibliothèque</h1>
-
-            {/* Liked tracks */}
+            <h1 className="text-3xl font-black text-white mb-6">{t('myLibrary')}</h1>
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Heart size={18} className="text-blue-500 fill-blue-500" /> Favoris
-                  <span className="text-sm font-normal text-[var(--text2)] ml-1">({liked.length})</span>
-                </h2>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2"><Heart size={18} className="text-blue-500 fill-blue-500" /> {t('favorites')}<span className="text-sm font-normal text-[var(--text2)] ml-1">({liked.length})</span></h2>
               </div>
               {liked.length === 0 ? (
-                <div className="rounded-2xl border border-white/8 p-8 text-center" style={{ background: '#111' }}>
-                  <Heart size={32} className="text-[var(--text3)] mx-auto mb-3" />
-                  <p className="text-[var(--text2)] text-sm">Aucun favori pour l'instant</p>
-                  <p className="text-[var(--text3)] text-xs mt-1">Appuyez sur ♥ pour ajouter des titres</p>
-                </div>
+                <div className="rounded-2xl border border-white/8 p-8 text-center" style={{ background: '#111' }}><Heart size={32} className="text-[var(--text3)] mx-auto mb-3" /><p className="text-[var(--text2)] text-sm">{t('noFav')}</p><p className="text-[var(--text3)] text-xs mt-1">{t('pressHeart')}</p></div>
               ) : (
-                <div>
-                  {liked.map((t, idx) => (
-                    <div key={t.id} onPointerDown={() => onPtrDown(t)} onPointerUp={() => onPtrUp(t, () => playTrack(t, liked, idx))} onPointerMove={onPtrMove} onPointerCancel={onPtrMove} onContextMenu={e => e.preventDefault()}>
-                      <TrackRow track={t} idx={idx} isPlaying={isPlaying} isCurrent={track?.id === t.id} onPlay={() => {}} onMore={() => setOptionsTrack(t)} />
-                    </div>
-                  ))}
-                </div>
+                <div>{liked.map((t_track, idx) => (<div key={t_track.id} onPointerDown={() => onPtrDown(t_track)} onPointerUp={() => onPtrUp(t_track, () => playTrack(t_track, liked, idx))} onPointerMove={onPtrMove} onPointerCancel={onPtrMove} onContextMenu={e => e.preventDefault()}><TrackRow track={t_track} idx={idx} isPlaying={isPlaying} isCurrent={track?.id === t_track.id} onPlay={() => {}} onMore={() => setOptionsTrack(t_track)} /></div>))}</div>
               )}
             </div>
 
-            {/* Playlists */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <ListMusic size={18} className="text-blue-500" /> Playlists
-                </h2>
-                <button onClick={() => setPlaylistModal(true)} className="flex items-center gap-1.5 text-sm font-semibold text-blue-500 hover:text-blue-400 transition-colors">
-                  <Plus size={16} /> Créer
-                </button>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2"><ListMusic size={18} className="text-blue-500" /> {t('playlists')}</h2>
+                <button onClick={() => setPlaylistModal(true)} className="flex items-center gap-1.5 text-sm font-semibold text-blue-500 hover:text-blue-400 transition-colors"><Plus size={16} /> {t('create')}</button>
               </div>
               {playlists.length === 0 ? (
-                <button onClick={() => setPlaylistModal(true)}
-                        className="w-full rounded-2xl border border-dashed border-white/15 p-8 text-center flex flex-col items-center gap-3 hover:border-blue-500/40 transition-colors">
-                  <Plus size={28} className="text-[var(--text3)]" />
-                  <p className="text-[var(--text2)] text-sm font-semibold">Créer une playlist</p>
-                </button>
+                <button onClick={() => setPlaylistModal(true)} className="w-full rounded-2xl border border-dashed border-white/15 p-8 text-center flex flex-col items-center gap-3 hover:border-blue-500/40 transition-colors"><Plus size={28} className="text-[var(--text3)]" /><p className="text-[var(--text2)] text-sm font-semibold">{t('createPlaylist')}</p></button>
               ) : (
                 <div className="space-y-3">
                   {playlists.map(pl => (
                     <div key={pl.id} className="flex items-center gap-4 p-4 rounded-2xl cursor-pointer card-hover" style={{ background: '#111' }}>
-                      <div className="w-14 h-14 rounded-xl bg-blue-600/20 flex items-center justify-center flex-shrink-0">
-                        <ListMusic size={22} className="text-blue-500" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-white text-sm truncate">{pl.name}</p>
-                        <p className="text-[var(--text2)] text-xs mt-0.5">{(pl.tracks || []).length} titre{(pl.tracks || []).length !== 1 ? 's' : ''}</p>
-                      </div>
+                      <div className="w-14 h-14 rounded-xl bg-blue-600/20 flex items-center justify-center flex-shrink-0"><ListMusic size={22} className="text-blue-500" /></div>
+                      <div className="flex-1 min-w-0"><p className="font-bold text-white text-sm truncate">{pl.name}</p><p className="text-[var(--text2)] text-xs mt-0.5">{(pl.tracks || []).length} {t('tracks')}</p></div>
                       <ChevronRight size={18} className="text-[var(--text3)] flex-shrink-0" />
                     </div>
                   ))}
-                  <button onClick={() => setPlaylistModal(true)}
-                          className="w-full flex items-center gap-4 p-4 rounded-2xl cursor-pointer border border-dashed border-white/10 hover:border-blue-500/30 transition-colors">
-                    <div className="w-14 h-14 rounded-xl border border-dashed border-white/15 flex items-center justify-center flex-shrink-0">
-                      <Plus size={22} className="text-[var(--text3)]" />
-                    </div>
-                    <span className="text-[var(--text2)] text-sm font-semibold">Nouvelle playlist</span>
-                  </button>
+                  <button onClick={() => setPlaylistModal(true)} className="w-full flex items-center gap-4 p-4 rounded-2xl cursor-pointer border border-dashed border-white/10 hover:border-blue-500/30 transition-colors"><div className="w-14 h-14 rounded-xl border border-dashed border-white/15 flex items-center justify-center flex-shrink-0"><Plus size={22} className="text-[var(--text3)]" /></div><span className="text-[var(--text2)] text-sm font-semibold">{t('newPlaylist')}</span></button>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* ══ ARTIST ══ */}
         {view === 'artist' && (
           <div className="h-full scroll-y fade-in" style={{ paddingBottom: bottomPad }}>
-            <div className="flex items-center gap-4 px-5 mb-6">
-              <button onClick={() => setView(prevView)} className="w-10 h-10 rounded-full flex items-center justify-center text-white" style={{ background: '#1c1c1e' }}>
-                <ArrowLeft size={20} />
-              </button>
-              <h2 className="text-xl font-black text-white truncate flex-1">{artistName}</h2>
-            </div>
-
-            {/* Artist header */}
+            <div className="flex items-center gap-4 px-5 mb-6"><button onClick={() => setView(prevView)} className="w-10 h-10 rounded-full flex items-center justify-center text-white" style={{ background: '#1c1c1e' }}><ArrowLeft size={20} /></button><h2 className="text-xl font-black text-white truncate flex-1">{artistName}</h2></div>
             <div className="px-5 mb-6">
               <div className="relative rounded-3xl overflow-hidden" style={{ height: 180 }}>
                 {artistTracks[0] && <img src={artistTracks[0].image} alt="" className="w-full h-full object-cover" />}
                 <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(10,10,10,0.2) 0%, rgba(10,10,10,0.95) 100%)' }} />
-                <div className="absolute bottom-0 left-0 right-0 p-5">
-                  <h2 className="text-2xl font-black text-white">{artistName}</h2>
-                  {artistTracks.length > 0 && (
-                    <button onClick={() => playTrack(artistTracks[0], artistTracks, 0)}
-                            className="mt-3 flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-600 text-white text-sm font-bold">
-                      <Play size={14} fill="white" /> Écouter
-                    </button>
-                  )}
-                </div>
+                <div className="absolute bottom-0 left-0 right-0 p-5"><h2 className="text-2xl font-black text-white">{artistName}</h2>{artistTracks.length > 0 && (<button onClick={() => playTrack(artistTracks[0], artistTracks, 0)} className="mt-3 flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-600 text-white text-sm font-bold"><Play size={14} fill="white" /> Écouter</button>)}</div>
               </div>
             </div>
-
-            {artistLoading ? (
-              <div className="flex justify-center py-16"><Spinner size={36} /></div>
-            ) : (
-              <div>
-                <p className="px-5 text-xs font-bold uppercase tracking-wider text-[var(--text2)] mb-3">Titres populaires</p>
-                {artistTracks.map((t, idx) => (
-                  <div key={t.id} onPointerDown={() => onPtrDown(t)} onPointerUp={() => onPtrUp(t, () => playTrack(t, artistTracks, idx))} onPointerMove={onPtrMove} onPointerCancel={onPtrMove} onContextMenu={e => e.preventDefault()}>
-                    <TrackRow track={t} idx={idx} isPlaying={isPlaying} isCurrent={track?.id === t.id} onPlay={() => {}} onMore={() => setOptionsTrack(t)} />
-                  </div>
-                ))}
-              </div>
-            )}
+            {artistLoading ? (<div className="flex justify-center py-16"><Spinner size={36} /></div>) : (<div><p className="px-5 text-xs font-bold uppercase tracking-wider text-[var(--text2)] mb-3">{t('popularTracks')}</p>{artistTracks.map((t_track, idx) => (<div key={t_track.id} onPointerDown={() => onPtrDown(t_track)} onPointerUp={() => onPtrUp(t_track, () => playTrack(t_track, artistTracks, idx))} onPointerMove={onPtrMove} onPointerCancel={onPtrMove} onContextMenu={e => e.preventDefault()}><TrackRow track={t_track} idx={idx} isPlaying={isPlaying} isCurrent={track?.id === t_track.id} onPlay={() => {}} onMore={() => setOptionsTrack(t_track)} /></div>))}</div>)}
           </div>
         )}
 
-        {/* ══ PROFILE ══ */}
         {view === 'profile' && (
           <div className="h-full scroll-y fade-in px-5" style={{ paddingBottom: bottomPad }}>
-            <h1 className="text-3xl font-black text-white mb-8">Profil</h1>
-
+            <h1 className="text-3xl font-black text-white mb-8">{t('profileTitle')}</h1>
             <div className="flex items-center gap-5 mb-8 p-5 rounded-3xl border border-white/8" style={{ background: '#111' }}>
               <Avatar size={64} textSize={28} />
-              <div className="min-w-0">
-                <h2 className="text-xl font-bold text-white truncate">{userData.name}</h2>
-                {userData.email ? (
-                  <p className="text-[var(--text2)] text-xs font-mono mt-1 truncate">{userData.email}</p>
-                ) : (
-                  <p className="text-red-400 text-xs mt-1 font-semibold">Email non renseigné</p>
-                )}
-              </div>
+              <div className="min-w-0"><h2 className="text-xl font-bold text-white truncate">{userData.name}</h2>{userData.email ? (<p className="text-[var(--text2)] text-xs font-mono mt-1 truncate">{userData.email}</p>) : (<p className="text-red-400 text-xs mt-1 font-semibold">{t('emailUnset')}</p>)}</div>
             </div>
-
-            {/* Stats */}
             <div className="grid grid-cols-3 gap-3 mb-8">
-              {[
-                { label: 'Favoris', value: liked.length, icon: <Heart size={18} className="text-blue-500" /> },
-                { label: 'Playlists', value: playlists.length, icon: <ListMusic size={18} className="text-blue-500" /> },
-                { label: 'Récents', value: recentlyPlayed.length, icon: <Clock size={18} className="text-blue-500" /> },
-              ].map(stat => (
-                <div key={stat.label} className="flex flex-col items-center gap-2 py-5 rounded-2xl border border-white/8" style={{ background: '#111' }}>
-                  {stat.icon}
-                  <span className="text-2xl font-black text-white">{stat.value}</span>
-                  <span className="text-[10px] text-[var(--text2)] font-semibold uppercase tracking-wide">{stat.label}</span>
-                </div>
-              ))}
+              {[{ label: t('favorites'), value: liked.length, icon: <Heart size={18} className="text-blue-500" /> }, { label: t('playlists'), value: playlists.length, icon: <ListMusic size={18} className="text-blue-500" /> }, { label: t('recent'), value: recentlyPlayed.length, icon: <Clock size={18} className="text-blue-500" /> }].map(stat => (<div key={stat.label} className="flex flex-col items-center gap-2 py-5 rounded-2xl border border-white/8" style={{ background: '#111' }}>{stat.icon}<span className="text-2xl font-black text-white">{stat.value}</span><span className="text-[10px] text-[var(--text2)] font-semibold uppercase tracking-wide text-center">{stat.label}</span></div>))}
             </div>
-
-            {/* Settings */}
             <div className="rounded-3xl border border-white/8 overflow-hidden mb-8" style={{ background: '#111' }}>
-              <button onClick={() => setPlaylistModal(true)} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-white/5 transition-colors border-b border-white/8">
-                <Plus size={20} className="text-blue-500" />
-                <span className="text-white font-medium">Créer une playlist</span>
-                <ChevronRight size={16} className="text-[var(--text3)] ml-auto" />
-              </button>
-              <button onClick={() => setView('library')} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-white/5 transition-colors">
-                <Library size={20} className="text-blue-500" />
-                <span className="text-white font-medium">Ma bibliothèque</span>
-                <ChevronRight size={16} className="text-[var(--text3)] ml-auto" />
-              </button>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
+                <div className="flex items-center gap-4">
+                  <Globe size={20} className="text-blue-500" />
+                  <span className="text-white font-medium">{t('language')}</span>
+                </div>
+                <button onClick={toggleLang} className="text-xs font-bold text-[var(--text2)] bg-white/10 px-3 py-1.5 rounded-full hover:text-white transition-colors">
+                  {t('switchLang')}
+                </button>
+              </div>
+              <button onClick={() => setPlaylistModal(true)} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-white/5 transition-colors border-b border-white/8"><Plus size={20} className="text-blue-500" /><span className="text-white font-medium">{t('createPlaylist')}</span><ChevronRight size={16} className="text-[var(--text3)] ml-auto" /></button>
+              <button onClick={() => setView('library')} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-white/5 transition-colors"><Library size={20} className="text-blue-500" /><span className="text-white font-medium">{t('myLibrary')}</span><ChevronRight size={16} className="text-[var(--text3)] ml-auto" /></button>
             </div>
-
-            <button onClick={() => setLogoutConfirm(true)}
-                    className="w-full py-4 rounded-2xl text-red-500 font-bold text-sm border border-red-500/20 hover:bg-red-500/10 transition-colors">
-              Se déconnecter
-            </button>
+            <button onClick={() => setLogoutConfirm(true)} className="w-full py-4 rounded-2xl text-red-500 font-bold text-sm border border-red-500/20 hover:bg-red-500/10 transition-colors">{t('logout')}</button>
           </div>
         )}
       </main>
 
-      {/* ── Mini Player ── */}
       {track && !playerOpen && (
-        <MiniPlayer
-          track={track} isPlaying={isPlaying} progress={progress}
-          isLiked={isLiked(track.id)}
-          onExpand={() => setPlayerOpen(true)}
-          onToggle={togglePlay}
-          onNext={playNext}
-          onLike={e => toggleLike(track, e)}
-        />
+        <MiniPlayer track={track} isPlaying={isPlaying} progress={progress} isLiked={isLiked(track.id)} onExpand={() => setPlayerOpen(true)} onToggle={togglePlay} onNext={playNext} onLike={e => toggleLike(track, e)} />
       )}
 
-      {/* ── Nav Bar ── */}
       <nav className="nav-bar">
-        {[
-          { id: 'home', icon: Home, label: 'Accueil' },
-          { id: 'search', icon: Search, label: 'Recherche' },
-          { id: 'library', icon: Library, label: 'Bibliothèque' },
-          { id: 'profile', icon: User, label: 'Profil' },
-        ].map(tab => {
-          const Icon = tab.icon;
-          const active = view === tab.id;
+        {[{ id: 'home', icon: Home, label: t('homeNav') }, { id: 'search', icon: Search, label: t('searchNav') }, { id: 'library', icon: Library, label: t('libNav') }, { id: 'profile', icon: User, label: t('profNav') }].map(tab => {
+          const Icon = tab.icon; const active = view === tab.id;
           return (
-            <button key={tab.id} onClick={() => setView(tab.id)}
-                    className="flex flex-col items-center gap-1 px-4 py-1 outline-none transition-colors"
-                    style={{ color: active ? 'var(--accent)' : 'var(--text3)' }}>
+            <button 
+              key={tab.id} 
+              onClick={() => {
+                if (tab.id === 'home' && view === 'home') {
+                  setReloadKey(k => k + 1);
+                  window.scrollTo({top: 0, behavior: 'smooth'});
+                } else {
+                  setView(tab.id);
+                }
+              }} 
+              className="flex flex-col items-center gap-1 px-4 py-1 outline-none transition-colors" 
+              style={{ color: active ? 'var(--accent)' : 'var(--text3)' }}
+            >
               <Icon size={24} strokeWidth={active ? 2.5 : 1.8} />
               <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, letterSpacing: '0.03em' }}>{tab.label}</span>
             </button>
           );
         })}
       </nav>
-
-      <style>{`
-        @keyframes eq {
-          0%, 100% { transform: scaleY(0.5); }
-          50% { transform: scaleY(1); }
-        }
-        .bg-white\\/8 { background: rgba(255,255,255,0.08); }
-        .border-white\\/8 { border-color: rgba(255,255,255,0.08); }
-        .hover\\:bg-white\\/12:hover { background: rgba(255,255,255,0.12); }
-        .bg-white\\/8:hover { background: rgba(255,255,255,0.1); }
-      `}</style>
+      <style>{`@keyframes eq { 0%, 100% { transform: scaleY(0.5); } 50% { transform: scaleY(1); } } .bg-white\\/8 { background: rgba(255,255,255,0.08); } .border-white\\/8 { border-color: rgba(255,255,255,0.08); } .hover\\:bg-white\\/12:hover { background: rgba(255,255,255,0.12); } .bg-white\\/8:hover { background: rgba(255,255,255,0.1); }`}</style>
     </div>
   );
 }
